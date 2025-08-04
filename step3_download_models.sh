@@ -93,20 +93,20 @@ download_file "config.json"
 
 echo ""
 echo "[2/7] 下载索引文件..."
-download_file "model.safetensors.index.json"
+download_file "diffusion_pytorch_model.safetensors.index.json"
 
 # 下载模型分片（大文件）
 echo ""
-echo "[3/7] 下载模型分片 1/3 (约5GB)..."
-download_file "model-00001-of-00003.safetensors"
+echo "[3/7] 下载模型分片 1/3 (约10GB)..."
+download_file "diffusion_pytorch_model-00001-of-00003.safetensors"
 
 echo ""
-echo "[4/7] 下载模型分片 2/3 (约5GB)..."
-download_file "model-00002-of-00003.safetensors"
+echo "[4/7] 下载模型分片 2/3 (约10GB)..."
+download_file "diffusion_pytorch_model-00002-of-00003.safetensors"
 
 echo ""
-echo "[5/7] 下载模型分片 3/3 (约5GB)..."
-download_file "model-00003-of-00003.safetensors"
+echo "[5/7] 下载模型分片 3/3 (约179MB)..."
+download_file "diffusion_pytorch_model-00003-of-00003.safetensors"
 
 # 下载其他文件
 echo ""
@@ -125,8 +125,8 @@ if [ ! -f "config.json" ]; then
     exit 1
 fi
 
-if [ ! -f "model.safetensors.index.json" ]; then
-    echo "✗ 错误: model.safetensors.index.json 缺失！"
+if [ ! -f "diffusion_pytorch_model.safetensors.index.json" ]; then
+    echo "✗ 错误: diffusion_pytorch_model.safetensors.index.json 缺失！"
     exit 1
 fi
 
