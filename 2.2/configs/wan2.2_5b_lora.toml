@@ -1,0 +1,167 @@
+# Wan2.2 5B (TI2V) LoRA Training Configuration
+# This configuration is optimized for training on 24GB GPUs (RTX 4090)
+
+# Output directory for training runs
+output_dir = '/data/diffusion_pipe_training_runs/wan22_5b_lora'
+
+# Dataset configuration file
+dataset = '2.2/configs/dataset_video.toml'
+
+# Optional: Separate evaluation datasets
+# eval_datasets = [
+#     {name = 'eval_videos', config = '2.2/configs/eval_dataset.toml'},
+# ]
+
+# ========== Training Settings ==========
+
+# Number of training epochs
+epochs = 100
+
+# Batch size per GPU for single forward/backward pass
+micro_batch_size_per_gpu = 1
+
+# For mixed video/image training, can use different batch size for images
+# image_micro_batch_size_per_gpu = 2
+
+# Pipeline parallelism degree (1 = single GPU or data parallel only)
+pipeline_stages = 1
+
+# Gradient accumulation for larger effective batch size
+gradient_accumulation_steps = 4  # Effective batch size = 4
+
+# Gradient clipping for stability
+gradient_clipping = 1.0
+
+# Learning rate warmup steps
+warmup_steps = 100
+
+# ========== Memory Optimization ==========
+
+# Block swapping for 24GB GPUs (offload transformer blocks to RAM)
+# Wan2.2 5B has 30 layers, can swap up to 25
+blocks_to_swap = 20  # Adjust based on your GPU memory
+
+# Activation checkpointing to save VRAM
+# 'unsloth' provides more memory savings with slight performance cost
+activation_checkpointing = 'unsloth'
+
+# ========== Evaluation Settings ==========
+
+eval_every_n_epochs = 5
+eval_before_first_step = true
+eval_micro_batch_size_per_gpu = 1
+eval_gradient_accumulation_steps = 1
+
+# Disable block swap during eval for faster evaluation
+disable_block_swap_for_eval = true
+
+# ========== Checkpoint Settings ==========
+
+# Save model every N epochs
+save_every_n_epochs = 10
+
+# Checkpoint training state for resuming
+checkpoint_every_n_minutes = 120
+
+# Save dtype (bfloat16 recommended for quality)
+save_dtype = 'bfloat16'
+
+# ========== Performance Settings ==========
+
+# Batch size for latent/text embedding caching
+caching_batch_size = 1
+
+# Number of parallel processes for dataset caching
+# map_num_proc = 8  # Increase if you have many CPU cores
+
+# Enable torch.compile for faster training (experimental)
+# compile = true
+
+# DeepSpeed logging frequency
+steps_per_print = 1
+
+# Video clip extraction mode
+# 'single_beginning': Extract from start of video
+# 'single_middle': Extract from middle of video
+# 'multiple_overlapping': Extract multiple clips
+video_clip_mode = 'single_beginning'
+
+# ========== Model Configuration ==========
+[model]
+type = 'wan'
+
+# Path to Wan2.2-TI2V-5B checkpoint
+ckpt_path = '/data/models/Wan2.2-TI2V-5B'
+
+# Base model dtype
+dtype = 'bfloat16'
+
+# Transformer dtype - use float8 to save memory on 24GB GPUs
+transformer_dtype = 'float8'  # Options: 'float8', 'bfloat16', 'float16'
+
+# Timestep sampling method for training
+timestep_sample_method = 'logit_normal'  # Better than 'uniform' for most cases
+
+# Optional: Load from ComfyUI safetensors instead
+# transformer_path = '/data/models/comfyui_safetensors/wan2.2_ti2v_5B_fp16.safetensors'
+# vae_path = '/data/models/comfyui_safetensors/wan2.2_vae.safetensors'
+# llm_path = '/data/models/comfyui_safetensors/umt5_xxl_fp16.safetensors'
+
+# ========== LoRA Adapter Configuration ==========
+[adapter]
+type = 'lora'
+
+# LoRA rank - higher rank = more parameters = better quality but slower
+rank = 32  # Good balance for most use cases
+
+# LoRA alpha (scaling factor)
+# alpha = 32  # Default is same as rank
+
+# LoRA dropout
+# dropout = 0.0
+
+# Dtype for LoRA weights
+dtype = 'bfloat16'
+
+# Target modules for LoRA (default targets all linear layers)
+# target_modules = ['to_q', 'to_k', 'to_v', 'to_out.0']
+
+# Initialize from existing LoRA (for continued training)
+# init_from_existing = '/data/previous_lora/epoch50'
+
+# ========== Optimizer Configuration ==========
+[optimizer]
+# AdamW with Kahan summation for bfloat16 training stability
+type = 'adamw_optimi'
+lr = 2e-5  # Good starting point for LoRA
+betas = [0.9, 0.99]
+weight_decay = 0.01
+eps = 1e-8
+
+# Alternative: 8-bit optimizer for even less memory usage
+# [optimizer]
+# type = 'AdamW8bitKahan'
+# lr = 2e-5
+# betas = [0.9, 0.99]
+# weight_decay = 0.01
+# stabilize = false
+
+# Alternative: Automagic optimizer (automatic LR scheduling)
+# [optimizer]
+# type = 'automagic'
+# initial_lr = 2e-5
+# final_lr = 2e-6
+# warmup_steps = 100
+
+# ========== Learning Rate Schedule ==========
+[lr_scheduler]
+# Cosine annealing with warmup
+type = 'cosine'
+# num_training_steps will be calculated automatically
+num_warmup_steps = 100
+# min_lr = 1e-6  # Minimum learning rate
+
+# Alternative: Constant LR with warmup
+# [lr_scheduler]
+# type = 'constant_with_warmup'
+# num_warmup_steps = 100
