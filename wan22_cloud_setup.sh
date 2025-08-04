@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# Wan2.2 5B 简化部署脚本 - 适用于云端自动化部署
-# 支持在任何目录运行，自动处理路径
+# Wan2.2 5B 云端部署脚本 - 修复版
+# 解决依赖安装和路径问题
 
 set -e  # 遇到错误立即退出
 
 echo "========================================="
-echo "Wan2.2 5B 云端自动化部署脚本"
+echo "Wan2.2 5B 云端自动化部署脚本 (修复版)"
 echo "========================================="
 echo ""
 
@@ -45,47 +45,9 @@ else
     echo "aria2 已安装"
 fi
 
-# 步骤 2: 创建 Python 依赖文件
+# 步骤 2: 安装 Python 依赖
 echo ""
-echo "步骤 2: 创建依赖文件..."
-cat > requirements_wan22.txt << 'EOF'
-# DeepSpeed - 跳过编译加速安装
-deepspeed==0.17.0
-
-# 核心依赖
-torch>=2.0.0
-transformers>=4.35.0
-accelerate>=0.24.0
-safetensors>=0.4.0
-einops>=0.7.0
-
-# 数据处理
-pillow>=10.0.0
-imageio[ffmpeg]>=2.31.0
-opencv-python-headless>=4.8.0
-av>=10.0.0
-
-# 训练工具
-tensorboard>=2.14.0
-wandb>=0.15.0
-toml>=0.10.2
-tqdm>=4.65.0
-
-# 优化器
-torch-optimi>=0.2.0
-bitsandbytes>=0.41.0
-
-# 其他
-packaging>=23.1
-huggingface_hub[cli]>=0.19.0
-sentencepiece>=0.1.99
-protobuf>=4.24.0
-peft>=0.7.0
-EOF
-
-# 安装 Python 依赖
-echo ""
-echo "安装 Python 依赖..."
+echo "步骤 2: 安装 Python 依赖..."
 
 # 检查是否在中国，使用镜像源
 if ping -c 1 -W 1 pypi.tuna.tsinghua.edu.cn &> /dev/null; then
@@ -97,33 +59,32 @@ fi
 echo "安装 DeepSpeed..."
 DS_BUILD_OPS=0 pip install deepspeed==0.17.0 || { echo "错误: DeepSpeed 安装失败"; exit 1; }
 
-# 安装其他依赖
-echo "安装其他依赖..."
-# 使用 --no-deps 逐个安装以避免哈希问题
-pip install --no-deps torch-optimi>=0.2.0
-pip install --no-deps transformers>=4.35.0
-pip install --no-deps accelerate>=0.24.0
-pip install --no-deps safetensors>=0.4.0
-pip install --no-deps imageio[ffmpeg]>=2.31.0
-pip install --no-deps opencv-python-headless>=4.8.0
-pip install --no-deps av>=10.0.0
-pip install --no-deps tensorboard>=2.14.0
-pip install --no-deps wandb>=0.15.0
-pip install --no-deps toml>=0.10.2
-pip install --no-deps sentencepiece>=0.1.99
-pip install --no-deps protobuf>=4.24.0
-pip install --no-deps peft>=0.7.0
-pip install --no-deps packaging>=23.1
-pip install --no-deps huggingface_hub[cli]>=0.19.0
+# 安装核心依赖
+echo "安装核心依赖..."
+pip install torch-optimi transformers accelerate safetensors einops toml tqdm peft packaging
 
-# bitsandbytes 单独处理，可能失败但不影响基础功能
+# 安装数据处理依赖
+echo "安装数据处理依赖..."
+pip install pillow "imageio[ffmpeg]" opencv-python-headless av
+
+# 安装训练工具
+echo "安装训练工具..."
+pip install tensorboard wandb sentencepiece protobuf "huggingface_hub[cli]"
+
+# 可选：安装 bitsandbytes
 echo "尝试安装 bitsandbytes（可选）..."
-pip install bitsandbytes>=0.41.0 || echo "警告: bitsandbytes 安装失败，但不影响基础训练"
+pip install bitsandbytes || echo "警告: bitsandbytes 安装失败，但不影响基础训练"
 
 # 步骤 3: 创建项目结构
 echo ""
 echo "步骤 3: 创建项目结构..."
-mkdir -p "$PROJECT_ROOT"/{2.2/{configs,scripts,downloads},models,training_outputs,datasets/{videos,images}}
+mkdir -p "$PROJECT_ROOT/2.2/configs"
+mkdir -p "$PROJECT_ROOT/2.2/scripts"
+mkdir -p "$PROJECT_ROOT/2.2/downloads"
+mkdir -p "$MODEL_DIR"
+mkdir -p "$OUTPUT_DIR"
+mkdir -p "$DATASET_DIR/videos"
+mkdir -p "$DATASET_DIR/images"
 
 # 步骤 4: 创建模型下载脚本
 echo ""
@@ -146,47 +107,48 @@ echo "下载 Wan2.2-TI2V-5B 模型"
 echo "模型目录: $MODEL_DIR"
 echo "========================================="
 
-# 模型文件列表
-declare -A MODEL_FILES=(
-    ["config.json"]="https://hf-mirror.com/Wan-AI/Wan2.2-TI2V-5B/resolve/main/config.json"
-    ["model.safetensors.index.json"]="https://hf-mirror.com/Wan-AI/Wan2.2-TI2V-5B/resolve/main/model.safetensors.index.json"
-    ["model-00001-of-00003.safetensors"]="https://hf-mirror.com/Wan-AI/Wan2.2-TI2V-5B/resolve/main/model-00001-of-00003.safetensors"
-    ["model-00002-of-00003.safetensors"]="https://hf-mirror.com/Wan-AI/Wan2.2-TI2V-5B/resolve/main/model-00002-of-00003.safetensors"
-    ["model-00003-of-00003.safetensors"]="https://hf-mirror.com/Wan-AI/Wan2.2-TI2V-5B/resolve/main/model-00003-of-00003.safetensors"
-    ["README.md"]="https://hf-mirror.com/Wan-AI/Wan2.2-TI2V-5B/resolve/main/README.md"
-    ["Wan2.2_VAE.pth"]="https://hf-mirror.com/Wan-AI/Wan2.2-TI2V-5B/resolve/main/Wan2.2_VAE.pth"
-)
+# 使用 HuggingFace 镜像
+export HF_ENDPOINT=https://hf-mirror.com
 
-# 检查并下载文件
-for file in "${!MODEL_FILES[@]}"; do
-    if [ -f "$file" ]; then
-        echo "文件已存在，跳过: $file"
-    else
-        echo "下载: $file"
-        url="${MODEL_FILES[$file]}"
-        
-        # 尝试下载，最多重试3次
-        for i in {1..3}; do
-            if aria2c -x 16 -s 16 -c \
-                --auto-file-renaming=false \
-                --file-allocation=none \
-                --check-certificate=false \
-                --console-log-level=error \
-                --summary-interval=10 \
-                -o "$file" "$url"; then
-                echo "下载成功: $file"
-                break
-            else
-                echo "下载失败，重试 $i/3: $file"
-                if [ $i -eq 3 ]; then
-                    echo "错误: 无法下载 $file"
-                    exit 1
-                fi
-                sleep 5
-            fi
-        done
+# 基础 URL
+BASE_URL="https://hf-mirror.com/Wan-AI/Wan2.2-TI2V-5B/resolve/main"
+
+# 下载函数
+download_file() {
+    local filename=$1
+    local url="$BASE_URL/$filename"
+    
+    if [ -f "$filename" ]; then
+        echo "文件已存在，跳过: $filename"
+        return 0
     fi
-done
+    
+    echo "下载: $filename"
+    
+    # 尝试下载，最多重试3次
+    for i in {1..3}; do
+        if wget -c "$url" -O "$filename" || curl -L -C - "$url" -o "$filename"; then
+            echo "下载成功: $filename"
+            return 0
+        else
+            echo "下载失败，重试 $i/3: $filename"
+            if [ $i -eq 3 ]; then
+                echo "错误: 无法下载 $filename"
+                return 1
+            fi
+            sleep 5
+        fi
+    done
+}
+
+# 下载所有文件
+download_file "config.json"
+download_file "model.safetensors.index.json"
+download_file "model-00001-of-00003.safetensors"
+download_file "model-00002-of-00003.safetensors"
+download_file "model-00003-of-00003.safetensors"
+download_file "README.md"
+download_file "Wan2.2_VAE.pth"
 
 # 验证关键文件
 echo ""
@@ -413,39 +375,81 @@ else
 fi
 
 echo ""
+echo "4. 检查创建的脚本："
+if [ -f "$PROJECT_ROOT/2.2/downloads/download_models.sh" ]; then
+    echo "✓ download_models.sh 存在"
+else
+    echo "✗ download_models.sh 不存在"
+fi
+
+if [ -f "$PROJECT_ROOT/2.2/scripts/train.sh" ]; then
+    echo "✓ train.sh 存在"
+else
+    echo "✗ train.sh 不存在"
+fi
+
+echo ""
 echo "测试完成！"
 TEST
 
 chmod +x "$PROJECT_ROOT/2.2/scripts/test_setup.sh"
 
 # 创建简单的 README
-cat > "$PROJECT_ROOT/README_SETUP.md" << 'README'
-# Wan2.2 5B 云端快速部署指南
+cat > "$PROJECT_ROOT/README_CLOUD_SETUP.md" << 'README'
+# Wan2.2 5B 云端快速部署指南（修复版）
+
+## 问题修复
+
+这个版本修复了以下问题：
+1. 依赖安装时的哈希值错误
+2. 下载脚本创建失败
+3. 使用 wget/curl 替代 aria2c 提高兼容性
 
 ## 一键部署
 
 ```bash
 # 1. 克隆仓库
 git clone https://github.com/Fiducial-Contact/15000_FC-Tools.git
-cd 15000_FC-Tools/diffusion-pipe-main
+cd 15000_FC-Tools
 
-# 2. 运行部署脚本
-chmod +x wan22_simplified_setup.sh
-./wan22_simplified_setup.sh
+# 2. 运行修复版部署脚本
+chmod +x wan22_cloud_setup.sh
+./wan22_cloud_setup.sh
 
-# 3. 下载模型
+# 3. 测试环境
+./2.2/scripts/test_setup.sh
+
+# 4. 下载模型
 ./2.2/downloads/download_models.sh
 
-# 4. 准备数据（将数据放入 datasets/ 目录）
+# 5. 准备数据（将数据放入 datasets/ 目录）
 
-# 5. 开始训练
+# 6. 开始训练
 ./2.2/scripts/train.sh
 ```
 
-## 测试环境
+## 手动修复步骤
+
+如果自动脚本失败，可以手动执行：
 
 ```bash
-./2.2/scripts/test_setup.sh
+# 安装依赖
+pip install deepspeed==0.17.0
+pip install torch-optimi transformers accelerate safetensors
+pip install einops toml tqdm peft packaging
+pip install pillow imageio opencv-python-headless av
+pip install tensorboard wandb sentencepiece protobuf huggingface_hub
+
+# 创建目录
+mkdir -p 2.2/{configs,scripts,downloads}
+mkdir -p models/Wan2.2-TI2V-5B
+mkdir -p training_outputs
+mkdir -p datasets/{videos,images}
+
+# 下载模型
+cd models/Wan2.2-TI2V-5B
+wget https://hf-mirror.com/Wan-AI/Wan2.2-TI2V-5B/resolve/main/config.json
+# ... 下载其他文件
 ```
 
 ## 注意事项
@@ -453,6 +457,7 @@ chmod +x wan22_simplified_setup.sh
 - 需要 24GB+ 显存的 GPU
 - Python 3.8+
 - CUDA 11.7+
+- 如果在中国使用，脚本会自动使用镜像源
 README
 
 echo ""
