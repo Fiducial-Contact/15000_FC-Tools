@@ -83,7 +83,9 @@ pip install --no-cache-dir pillow
 pip install --no-cache-dir imageio
 pip install --no-cache-dir imageio-ffmpeg
 pip install --no-cache-dir opencv-python-headless
-pip install --no-cache-dir av
+# av 包可能在某些镜像源上有哈希值问题，使用官方源或清华源
+pip install --no-cache-dir av --index-url https://pypi.org/simple || \
+pip install --no-cache-dir av -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 安装训练工具
 echo "安装训练工具..."
@@ -119,4 +121,7 @@ echo "Step 1 完成！环境设置成功"
 echo "========================================="
 echo ""
 echo "下一步：运行 ./step2_create_structure.sh"
+echo ""
+echo "注意：如果 av 包安装失败（哈希值错误），请手动运行："
+echo "  pip install av --index-url https://pypi.org/simple"
 echo "========================================="
