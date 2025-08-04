@@ -1,0 +1,130 @@
+# Wan2.2 5B Dataset Configuration
+# This config supports both video and image training for TI2V model
+
+# ========== Resolution Settings ==========
+
+# Training resolutions (in pixels)
+# Wan2.2 5B supports various resolutions. Common choices:
+# - 512: Fast training, lower quality
+# - 768: Good balance
+# - 1024: High quality but requires more VRAM
+resolutions = [768]  # 768x768 base resolution
+
+# For multiple resolution training (recommended for better generalization):
+# resolutions = [512, 768]
+
+# You can also specify as (width, height) pairs:
+# resolutions = [[1280, 720], [1920, 1080]]  # 720p and 1080p
+
+# ========== Aspect Ratio Bucketing ==========
+
+# Enable aspect ratio bucketing for varied aspect ratios
+enable_ar_bucket = true
+
+# Aspect ratio range (width/height)
+min_ar = 0.5   # 1:2 (tall videos)
+max_ar = 2.0   # 2:1 (wide videos)
+
+# Number of aspect ratio buckets
+num_ar_buckets = 7  # Creates 7 evenly spaced buckets
+
+# Or manually specify buckets:
+# ar_buckets = [[768, 768], [1024, 576], [576, 1024]]  # 1:1, 16:9, 9:16
+
+# ========== Frame Bucketing (Video) ==========
+
+# Frame buckets for video training
+# Wan2.2 5B default is 121 frames (5 seconds @ 24fps)
+# But we can train on shorter clips for efficiency
+frame_buckets = [1, 49, 97, 121]  # Images, 2s, 4s, 5s videos
+
+# Simpler setup for memory-constrained training:
+# frame_buckets = [1, 49]  # Just images and 2-second videos
+
+# ========== Caption Preprocessing ==========
+
+# Shuffle captions for augmentation (0 = no shuffle)
+# cache_shuffle_num = 5  # Shuffle captions 5 different ways
+
+# Caption delimiter for shuffling
+# cache_shuffle_delimiter = ", "
+
+# ========== Dataset Directories ==========
+
+# Video dataset
+[[directory]]
+# Path to directory containing videos and caption files
+path = '/data/datasets/wan22_videos'
+
+# Optional: Path to mask directory for masked training
+# mask_path = '/data/datasets/wan22_videos/masks'
+
+# Dataset repetition per epoch
+num_repeats = 1
+
+# Override settings for this directory
+# frame_buckets = [49, 97, 121]  # Only videos, no images
+# resolutions = [768]
+
+# Image dataset (for TI2V model, images are treated as 1-frame videos)
+[[directory]]
+path = '/data/datasets/wan22_images'
+num_repeats = 2  # Repeat images more since there are usually fewer
+
+# Images only use frame bucket of 1
+frame_buckets = [1]
+
+# Can use different resolution for images
+# resolutions = [512, 768, 1024]
+
+# High-quality curated dataset (optional)
+# [[directory]]
+# path = '/data/datasets/wan22_curated'
+# num_repeats = 3  # Emphasize high-quality data
+# resolutions = [1024]  # Train at higher resolution
+
+# ========== Dataset Examples ==========
+
+# Example 1: Simple video-only training
+# [[directory]]
+# path = '/data/my_videos'
+# frame_buckets = [121]  # Only 5-second clips
+# resolutions = [768]
+# num_repeats = 1
+
+# Example 2: Mixed image and video training
+# [[directory]]
+# path = '/data/mixed_media'
+# frame_buckets = [1, 121]  # Images and 5s videos
+# resolutions = [512, 768]
+# num_repeats = 1
+
+# Example 3: Multi-resolution video training
+# [[directory]]
+# path = '/data/hd_videos'
+# frame_buckets = [49, 97]  # 2s and 4s clips
+# resolutions = [[1280, 720], [1920, 1080]]
+# ar_buckets = [[16, 9]]  # Force 16:9 aspect ratio
+# num_repeats = 1
+
+# ========== Important Notes ==========
+
+# 1. File Structure:
+#    - Each media file needs a corresponding .txt caption file
+#    - video001.mp4 → video001.txt
+#    - image001.jpg → image001.txt
+
+# 2. Caption Format:
+#    - Simple text description in the .txt file
+#    - Can use tags separated by commas for shuffling
+#    - Example: "a cat, sitting on a mat, indoors, sunny day"
+
+# 3. Video Requirements:
+#    - Supported formats: mp4, avi, mov, webm (not multi-frame WebP)
+#    - Minimum length should exceed largest frame bucket
+#    - Videos shorter than frame bucket will be dropped
+
+# 4. Memory Considerations:
+#    - Larger resolutions and frame counts use more VRAM
+#    - Start with smaller values and increase gradually
+#    - Use blocks_to_swap in main config if OOM occurs
