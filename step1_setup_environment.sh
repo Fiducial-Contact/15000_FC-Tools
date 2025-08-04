@@ -48,27 +48,70 @@ echo "安装 Python 依赖..."
 if ping -c 1 -W 1 pypi.tuna.tsinghua.edu.cn &> /dev/null; then
     echo "使用清华镜像源..."
     pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+    pip config set global.trusted-host pypi.tuna.tsinghua.edu.cn
 fi
+
+# 清理可能的缓存问题
+echo "清理 pip 缓存..."
+pip cache purge 2>/dev/null || true
 
 # 安装 DeepSpeed（跳过编译）
 echo "安装 DeepSpeed..."
-DS_BUILD_OPS=0 pip install deepspeed==0.17.0 || { echo "错误: DeepSpeed 安装失败"; exit 1; }
+DS_BUILD_OPS=0 pip install --no-cache-dir deepspeed==0.17.0 || { echo "错误: DeepSpeed 安装失败"; exit 1; }
 
-# 安装核心依赖
+# 首先确保 PyTorch 已正确安装
+echo "检查/安装 PyTorch..."
+if ! python -c "import torch" 2>/dev/null; then
+    echo "安装 PyTorch..."
+    # 使用官方源安装 PyTorch 以避免哈希问题
+    pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cu118 || \
+    pip install --no-cache-dir torch || \
+    { echo "错误: PyTorch 安装失败"; exit 1; }
+fi
+
+# 安装核心依赖（使用 --no-deps 逐个安装避免依赖冲突）
 echo "安装核心依赖..."
-pip install torch-optimi transformers accelerate safetensors einops toml tqdm peft packaging
+# torch-optimi 需要特殊处理
+pip install --no-cache-dir --no-deps torch-optimi || echo "警告: torch-optimi 安装失败，使用标准优化器"
+
+# 安装其他核心依赖
+pip install --no-cache-dir transformers accelerate safetensors einops toml tqdm peft packaging
 
 # 安装数据处理依赖
 echo "安装数据处理依赖..."
-pip install pillow "imageio[ffmpeg]" opencv-python-headless av
+pip install --no-cache-dir pillow
+pip install --no-cache-dir imageio
+pip install --no-cache-dir imageio-ffmpeg
+pip install --no-cache-dir opencv-python-headless
+pip install --no-cache-dir av
 
 # 安装训练工具
 echo "安装训练工具..."
-pip install tensorboard wandb sentencepiece protobuf "huggingface_hub[cli]"
+pip install --no-cache-dir tensorboard wandb sentencepiece protobuf
+pip install --no-cache-dir huggingface_hub
 
 # 可选：安装 bitsandbytes
 echo "尝试安装 bitsandbytes（可选）..."
-pip install bitsandbytes || echo "警告: bitsandbytes 安装失败，但不影响基础训练"
+pip install --no-cache-dir bitsandbytes || echo "警告: bitsandbytes 安装失败，但不影响基础训练"
+
+# 再次检查关键依赖
+echo ""
+echo "验证关键依赖..."
+python -c "
+import importlib
+required = ['torch', 'transformers', 'deepspeed', 'accelerate', 'safetensors']
+missing = []
+for pkg in required:
+    try:
+        importlib.import_module(pkg)
+        print(f'✓ {pkg} 已安装')
+    except ImportError:
+        print(f'✗ {pkg} 未安装')
+        missing.append(pkg)
+if missing:
+    print(f'\\n错误: 缺少关键依赖: {missing}')
+    exit(1)
+"
 
 echo ""
 echo "========================================="
