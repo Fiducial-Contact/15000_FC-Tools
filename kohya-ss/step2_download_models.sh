@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# WAN2.2 Model Download Script using aria2c
-# Downloads all required models for WAN2.2 LoRA training
-# Uses aria2c for better download performance and SSL handling
+# WAN2.2 Model Download Script - Parallel Version
+# Downloads all models simultaneously for maximum speed
+# Uses aria2c with optimized settings
 
 set -e
 
 echo "========================================="
-echo "WAN2.2 Model Download Script (aria2c)"
+echo "WAN2.2 Model Download Script (Parallel)"
 echo "========================================="
 echo ""
 
@@ -51,6 +51,56 @@ fi
 MODEL_DIR="musubi-tuner/models"
 mkdir -p "$MODEL_DIR"/{diffusion_models,text_encoders,vae}
 
+# Create download list file
+DOWNLOAD_LIST="$SCRIPT_DIR/download_list.txt"
+rm -f "$DOWNLOAD_LIST"
+
+# Model URLs and paths
+cat > "$DOWNLOAD_LIST" << EOF
+https://huggingface.co/Wan-AI/Wan2.1-I2V-14B-720P/resolve/main/models_t5_umt5-xxl-enc-bf16.pth
+	dir=$MODEL_DIR/text_encoders
+	out=models_t5_umt5-xxl-enc-bf16.pth
+
+https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors
+	dir=$MODEL_DIR/vae
+	out=wan_2.1_vae.safetensors
+
+https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_t2v_high_noise_14B_fp16.safetensors
+	dir=$MODEL_DIR/diffusion_models
+	out=wan2.2_t2v_high_noise_14B_fp16.safetensors
+
+https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp16.safetensors
+	dir=$MODEL_DIR/diffusion_models
+	out=wan2.2_t2v_low_noise_14B_fp16.safetensors
+EOF
+
+echo "Starting parallel downloads..."
+echo "Total download size: ~30GB"
+echo ""
+print_info "Downloading all models simultaneously for maximum speed"
+echo ""
+
+# Download all files in parallel with aria2c
+# Optimized settings for maximum speed:
+aria2c \
+    --input-file="$DOWNLOAD_LIST" \
+    --max-concurrent-downloads=4 \
+    --split=16 \
+    --max-connection-per-server=16 \
+    --min-split-size=1M \
+    --check-certificate=false \
+    --file-allocation=none \
+    --continue=true \
+    --auto-file-renaming=false \
+    --allow-overwrite=true \
+    --console-log-level=info \
+    --summary-interval=5 \
+    --download-result=full \
+    --human-readable=true
+
+# Clean up
+rm -f "$DOWNLOAD_LIST"
+
 # Function to check file existence and size
 check_model() {
     local file_path=$1
@@ -68,104 +118,6 @@ check_model() {
         return 1
     fi
 }
-
-# Function to download with aria2c
-download_with_aria2c() {
-    local url=$1
-    local output_path=$2
-    local expected_size=$3
-    local description=$4
-    
-    echo ""
-    print_info "Checking $description..."
-    
-    if check_model "$output_path" "$expected_size"; then
-        print_status "$description already downloaded"
-        return 0
-    fi
-    
-    print_info "Downloading $description..."
-    print_info "Using aria2c for multi-threaded download"
-    
-    # Create directory if needed
-    local output_dir=$(dirname "$output_path")
-    mkdir -p "$output_dir"
-    
-    # Download with aria2c - optimized for maximum speed
-    # -x16 : 16 connections per server
-    # -s16 : Split file into 16 pieces
-    # -k1M : 1MB chunk size
-    # -j5 : Download 5 files concurrently
-    # --min-split-size=1M : Don't split files smaller than 1MB
-    # --split=16 : Use 16 connections total
-    # --max-connection-per-server=16 : Max connections per server
-    # --max-concurrent-downloads=5 : Download multiple files at once
-    # --check-certificate=false : Skip SSL verification
-    # --file-allocation=none : No preallocation (faster startup)
-    # --auto-file-renaming=false : Don't rename files
-    # --allow-overwrite=true : Overwrite incomplete files
-    aria2c -x16 -s16 -k1M -j5 \
-        --min-split-size=1M \
-        --split=16 \
-        --max-connection-per-server=16 \
-        --max-concurrent-downloads=5 \
-        --check-certificate=false \
-        --file-allocation=none \
-        --continue=true \
-        --auto-file-renaming=false \
-        --allow-overwrite=true \
-        --console-log-level=notice \
-        --summary-interval=10 \
-        --dir="$output_dir" \
-        --out="$(basename "$output_path")" \
-        "$url"
-    
-    if check_model "$output_path" "$expected_size"; then
-        print_status "$description downloaded successfully"
-    else
-        print_error "Failed to download $description"
-        return 1
-    fi
-}
-
-# Download models
-echo "Starting model downloads..."
-echo "Total download size: ~30GB"
-echo ""
-
-# Model URLs
-T5_URL="https://huggingface.co/Wan-AI/Wan2.1-I2V-14B-720P/resolve/main/models_t5_umt5-xxl-enc-bf16.pth"
-VAE_URL="https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors"
-HIGH_NOISE_URL="https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_t2v_high_noise_14B_fp16.safetensors"
-LOW_NOISE_URL="https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp16.safetensors"
-
-# 1. T5 Text Encoder (UMT5-XXL)
-download_with_aria2c \
-    "$T5_URL" \
-    "$MODEL_DIR/text_encoders/models_t5_umt5-xxl-enc-bf16.pth" \
-    4700 \
-    "T5 Text Encoder (UMT5-XXL)"
-
-# 2. VAE Model
-download_with_aria2c \
-    "$VAE_URL" \
-    "$MODEL_DIR/vae/wan_2.1_vae.safetensors" \
-    650 \
-    "WAN 2.1 VAE Model"
-
-# 3. WAN2.2 High Noise Model
-download_with_aria2c \
-    "$HIGH_NOISE_URL" \
-    "$MODEL_DIR/diffusion_models/wan2.2_t2v_high_noise_14B_fp16.safetensors" \
-    13000 \
-    "WAN2.2 High Noise Model (14B FP16)"
-
-# 4. WAN2.2 Low Noise Model
-download_with_aria2c \
-    "$LOW_NOISE_URL" \
-    "$MODEL_DIR/diffusion_models/wan2.2_t2v_low_noise_14B_fp16.safetensors" \
-    13000 \
-    "WAN2.2 Low Noise Model (14B FP16)"
 
 # Create model path configuration file
 echo ""
