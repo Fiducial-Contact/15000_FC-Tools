@@ -180,30 +180,21 @@ if python -c "import musubi_tuner" 2>/dev/null; then
     print_status "musubi-tuner is already installed"
 else
     print_status "Installing musubi-tuner in editable mode..."
-    # For packages from aliyun mirror, add extra index
-    # Note: If bitsandbytes download fails, it will be installed separately
-    python -m pip install --timeout=120 --retries=3 -e . --extra-index-url https://mirrors.aliyun.com/pypi/simple/ || {
-        print_warning "Installation failed, trying without bitsandbytes..."
-        # Try installing without bitsandbytes first
-        python -m pip install --timeout=120 --retries=3 --no-deps -e .
-        # Then install other dependencies
-        python -m pip install --timeout=120 --retries=3 accelerate diffusers transformers huggingface-hub safetensors \
-            opencv-python av sentencepiece tqdm einops voluptuous easydict toml ftfy \
-            --extra-index-url https://mirrors.aliyun.com/pypi/simple/
-        # Try bitsandbytes separately with longer timeout
-        print_warning "Attempting to install bitsandbytes separately..."
-        python -m pip install --timeout=300 --retries=5 bitsandbytes==0.45.4 || print_warning "Bitsandbytes installation failed, continuing without it"
-    }
+    # Following AI_Characters' guide exactly
+    pip install -e .
 fi
 
-# Install additional required packages
-print_status "Installing additional dependencies..."
-echo "Using pip: $(which pip)"
-python -m pip install --timeout=120 --retries=3 protobuf six
+# Install protobuf and six separately (always do this to ensure they're installed)
+print_status "Installing protobuf and six..."
+pip install protobuf
+pip install six
 
 # Step 8: Verify installation
 echo ""
 echo "Step 8: Verifying installation..."
+
+# Small delay to ensure all packages are properly installed
+sleep 2
 
 # Run verification (virtual environment is already activated from Step 4)
 # Debug: Check which Python we're using
