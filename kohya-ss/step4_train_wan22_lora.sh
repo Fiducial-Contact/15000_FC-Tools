@@ -150,8 +150,49 @@ source model_paths.sh
 # Check dataset
 DATASET_CONFIG="$SCRIPT_DIR/dataset/dataset.toml"
 if [ ! -f "$DATASET_CONFIG" ]; then
-    print_error "Dataset configuration not found. Please run ./prepare_dataset.sh first"
+    print_error "Dataset configuration not found. Please run ./step3_prepare_dataset.sh first"
     exit 1
+fi
+
+# Check for actual dataset files
+image_count=$(find "$SCRIPT_DIR/dataset/images" -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.webp" \) 2>/dev/null | wc -l)
+video_count=$(find "$SCRIPT_DIR/dataset/videos" -type f \( -iname "*.mp4" -o -iname "*.avi" -o -iname "*.mov" -o -iname "*.mkv" \) 2>/dev/null | wc -l)
+
+if [ "$image_count" -eq 0 ] && [ "$video_count" -eq 0 ]; then
+    print_error "No training data found!"
+    echo ""
+    echo "Please add your training data:"
+    echo "  1. Copy images to: $SCRIPT_DIR/dataset/images/"
+    echo "  2. Create .txt caption files for each image"
+    echo "  3. Include trigger phrase \"$TRIGGER_PHRASE\" in all captions"
+    echo ""
+    echo "See dataset/PREPARE_YOUR_DATA_HERE.md for detailed instructions"
+    exit 1
+fi
+
+print_info "Found $image_count images and $video_count videos in dataset"
+
+# Check for captions
+missing_captions=0
+if [ "$image_count" -gt 0 ]; then
+    for img in "$SCRIPT_DIR/dataset/images"/*.{jpg,jpeg,png,webp} 2>/dev/null; do
+        [ -f "$img" ] || continue
+        base_name=$(basename "$img" | sed 's/\.[^.]*$//')
+        caption_file="$SCRIPT_DIR/dataset/images/${base_name}.txt"
+        if [ ! -f "$caption_file" ]; then
+            missing_captions=$((missing_captions + 1))
+        fi
+    done
+fi
+
+if [ "$missing_captions" -gt 0 ]; then
+    print_warning "Found $missing_captions images without captions"
+    echo "Each image needs a corresponding .txt file with a caption"
+    read -p "Continue anyway? (y/N) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        exit 1
+    fi
 fi
 
 # Check GPU memory and adjust settings

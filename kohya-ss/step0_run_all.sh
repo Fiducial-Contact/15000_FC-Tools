@@ -236,47 +236,77 @@ if ! run_step 3 "Dataset Preparation" "step3_prepare_dataset.sh" \
     exit 1
 fi
 
-# Check if dataset has files
-image_count=$(find "$SCRIPT_DIR/dataset/images" -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.webp" \) 2>/dev/null | wc -l)
-if [ "$image_count" -eq 0 ]; then
-    print_error "No images found in dataset/images/"
-    print_info "Please add your training images and their captions, then run:"
-    print_info "  $0 --start-from 3"
-    exit 1
-fi
-
-# Step 4: Training
-echo ""
-echo "========================================="
-echo "Step 4: Training"
-echo "========================================="
-echo "Ready to start training with the following settings:"
-echo "  - LoRA Name: $LORA_NAME"
-echo "  - Author: $AUTHOR_NAME"
-echo "  - Trigger: $TRIGGER_PHRASE"
-echo "  - Dataset: $image_count images"
-echo ""
-
-if [ "$AUTO_MODE" != true ]; then
-    read -p "Start training now? (Y/n) " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Nn]$ ]]; then
-        print_warning "Training cancelled"
-        print_info "You can start training later with:"
-        print_info "  ./step4_train_wan22_lora.sh --name \"$LORA_NAME\" --author \"$AUTHOR_NAME\" --trigger \"$TRIGGER_PHRASE\""
-        exit 0
+# Check if this is a continuation (step 4 only)
+if [ "$START_FROM_STEP" -eq 4 ] && [ "$#" -eq 2 ]; then
+    # User is continuing from step 4, check dataset
+    image_count=$(find "$SCRIPT_DIR/dataset/images" -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.webp" \) 2>/dev/null | wc -l)
+    
+    if [ "$image_count" -eq 0 ]; then
+        print_error "No images found in dataset/images/"
+        print_info "Please add your training images with corresponding .txt caption files"
+        print_info "Then run: $0 --start-from 4"
+        exit 1
     fi
-fi
-
-# Run training with saved parameters
-if bash "$SCRIPT_DIR/step4_train_wan22_lora.sh" \
-    --name "$LORA_NAME" \
-    --author "$AUTHOR_NAME" \
-    --trigger "$TRIGGER_PHRASE"; then
-    print_status "Training completed successfully!"
+    
+    # Step 4: Training
+    echo ""
+    echo "========================================="
+    echo "Step 4: Training"
+    echo "========================================="
+    echo "Found $image_count images in dataset"
+    echo "Ready to start training with:"
+    echo "  - LoRA Name: $LORA_NAME"
+    echo "  - Author: $AUTHOR_NAME"
+    echo "  - Trigger: $TRIGGER_PHRASE"
+    echo ""
+    
+    if [ "$AUTO_MODE" != true ]; then
+        read -p "Start training now? (Y/n) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Nn]$ ]]; then
+            print_warning "Training cancelled"
+            exit 0
+        fi
+    fi
+    
+    # Run training
+    if bash "$SCRIPT_DIR/step4_train_wan22_lora.sh" \
+        --name "$LORA_NAME" \
+        --author "$AUTHOR_NAME" \
+        --trigger "$TRIGGER_PHRASE"; then
+        print_status "Training completed successfully!"
+    else
+        print_error "Training failed"
+        exit 1
+    fi
 else
-    print_error "Training failed"
-    exit 1
+    # Normal flow - stop after step 3
+    echo ""
+    echo "========================================="
+    echo "Setup Complete - Ready for Dataset!"
+    echo "========================================="
+    echo ""
+    print_status "Environment is set up"
+    print_status "Models are downloaded"
+    print_status "Dataset structure is prepared"
+    echo ""
+    echo "Next steps:"
+    echo "  1. Add your training images to: $SCRIPT_DIR/dataset/images/"
+    echo "  2. Create a .txt caption file for each image"
+    echo "     Example: image001.jpg → image001.txt"
+    echo "  3. Include your trigger phrase in every caption: \"$TRIGGER_PHRASE\""
+    echo ""
+    echo "See dataset/PREPARE_YOUR_DATA_HERE.md for detailed instructions"
+    echo ""
+    echo "When ready, continue training with:"
+    echo "  $0 --start-from 4"
+    echo ""
+    echo "Or use the quick training script:"
+    echo "  ./quick_train.sh \"$LORA_NAME\" \"$TRIGGER_PHRASE\""
+    echo ""
+    
+    # Save config for later use
+    print_info "Your settings have been saved for easy resumption"
 fi
 
 # Final summary
