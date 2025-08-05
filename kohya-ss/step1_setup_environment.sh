@@ -192,7 +192,12 @@ echo ""
 echo "Step 8: Verifying installation..."
 
 # Run verification (virtual environment is already activated from Step 4)
-python -c "
+# Debug: Check which Python we're using
+echo "Using Python: $(which python)"
+echo "Python version: $(python --version)"
+
+# Run verification with explicit python from venv
+"$SCRIPT_DIR/$VENV_DIR/bin/python" -c "
 import sys
 try:
     import torch
