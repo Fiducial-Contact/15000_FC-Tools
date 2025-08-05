@@ -135,10 +135,8 @@ if ! conda env list | grep -q "^${ENV_NAME} "; then
     exit 1
 fi
 
-# Activate environment
-print_info "Activating conda environment..."
-eval "$(conda shell.bash hook)"
-conda activate ${ENV_NAME}
+# Note: We'll use conda run instead of activating the environment
+print_info "Using conda environment '${ENV_NAME}' for training..."
 
 # Check for models
 if [ ! -f "model_paths.sh" ]; then
@@ -177,7 +175,7 @@ print_info "Found $image_count images and $video_count videos in dataset"
 # Check for captions
 missing_captions=0
 if [ "$image_count" -gt 0 ]; then
-    for img in "$SCRIPT_DIR/dataset/images"/*.{jpg,jpeg,png,webp} 2>/dev/null; do
+    for img in "$SCRIPT_DIR/dataset/images"/*.jpg "$SCRIPT_DIR/dataset/images"/*.jpeg "$SCRIPT_DIR/dataset/images"/*.png "$SCRIPT_DIR/dataset/images"/*.webp; do
         [ -f "$img" ] || continue
         base_name=$(basename "$img" | sed 's/\.[^.]*$//')
         caption_file="$SCRIPT_DIR/dataset/images/${base_name}.txt"
@@ -255,7 +253,7 @@ train_model() {
     local title="${LORA_NAME}-${model_type}"
     
     # Build training command
-    local cmd="accelerate launch --num_cpu_threads_per_process 1"
+    local cmd="python -m accelerate launch --num_cpu_threads_per_process 1"
     cmd="$cmd src/musubi_tuner/wan_train_network.py"
     cmd="$cmd --task t2v-A14B"
     cmd="$cmd --dit \"$model_path\""
@@ -304,9 +302,9 @@ train_model() {
     echo "$cmd"
     echo ""
     
-    # Execute training
+    # Execute training using conda run
     cd musubi-tuner
-    eval $cmd
+    conda run -n ${ENV_NAME} $cmd
     local exit_code=$?
     cd ..
     

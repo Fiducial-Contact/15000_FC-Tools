@@ -1,343 +1,163 @@
 #!/bin/bash
 
-# WAN2.2 LoRA Training Environment Setup Script
-# Based on AI_Characters' workflow and community best practices
-# This script provides intelligent environment detection and setup
+# WAN2.2 LoRA Training Environment Setup
+# Simplified version - focuses on essential setup steps
 
 set -e
 
-# Initialize conda for this script
-if [ -f "/root/miniconda3/etc/profile.d/conda.sh" ]; then
-    source "/root/miniconda3/etc/profile.d/conda.sh"
-else
-    export PATH="/root/miniconda3/bin:$PATH"
-fi
-
-echo "========================================="
-echo "WAN2.2 LoRA Training Environment Setup"
-echo "========================================="
-echo ""
-
-# Colors for output
+# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Get script directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
-
-# Function to print colored output
 print_status() {
     echo -e "${GREEN}[✓]${NC} $1"
-}
-
-print_warning() {
-    echo -e "${YELLOW}[!]${NC} $1"
 }
 
 print_error() {
     echo -e "${RED}[✗]${NC} $1"
 }
 
+print_warning() {
+    echo -e "${YELLOW}[!]${NC} $1"
+}
+
 print_info() {
     echo -e "${BLUE}[i]${NC} $1"
 }
 
-# Step 1: Check Python version
-echo "Step 1: Checking Python version..."
+echo "========================================="
+echo "WAN2.2 LoRA Training Environment Setup"
+echo "========================================="
+echo ""
+
+# Get script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+# Check Python
+echo "Checking system requirements..."
 PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
 PYTHON_MAJOR=$(echo $PYTHON_VERSION | cut -d. -f1)
 PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d. -f2)
 
 if [ "$PYTHON_MAJOR" -ge 3 ] && [ "$PYTHON_MINOR" -ge 10 ]; then
-    print_status "Python $PYTHON_VERSION is installed (3.10+ required)"
+    print_status "Python $PYTHON_VERSION found"
 else
-    print_error "Python 3.10+ is required, but $PYTHON_VERSION is installed"
+    print_error "Python 3.10+ required, but $PYTHON_VERSION found"
     exit 1
 fi
 
-# Step 2: Check CUDA and GPU
-echo ""
-echo "Step 2: Checking GPU and CUDA..."
+# Check GPU
 if command -v nvidia-smi &> /dev/null; then
     GPU_INFO=$(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader,nounits | head -1)
     GPU_NAME=$(echo $GPU_INFO | cut -d',' -f1 | xargs)
     GPU_MEMORY=$(echo $GPU_INFO | cut -d',' -f2 | xargs)
+    print_status "GPU: $GPU_NAME (${GPU_MEMORY}MB)"
     
-    print_status "GPU detected: $GPU_NAME with ${GPU_MEMORY}MB memory"
-    
-    # Check GPU memory
     if [ "$GPU_MEMORY" -lt 16000 ]; then
         print_warning "GPU has less than 16GB VRAM. Training may be challenging."
-        print_warning "Consider using --blocks_to_swap 20 parameter during training."
-    elif [ "$GPU_MEMORY" -lt 24000 ]; then
-        print_warning "GPU has less than 24GB VRAM. Some optimizations may be needed."
-    else
-        print_status "GPU memory is sufficient for training"
     fi
-    
-    # Get CUDA version
-    CUDA_VERSION=$(nvidia-smi | grep "CUDA Version" | awk '{print $9}' | head -1)
-    print_status "CUDA Version: $CUDA_VERSION"
 else
-    print_error "No GPU detected. WAN2.2 training requires a CUDA-capable GPU"
+    print_error "No GPU detected. WAN2.2 training requires CUDA GPU"
     exit 1
 fi
 
-# Step 3: Check if musubi-tuner is already cloned
+# Check conda
+if ! command -v conda &> /dev/null; then
+    print_error "Conda not found. Please install miniconda or anaconda first."
+    echo ""
+    echo "Download from: https://docs.conda.io/en/latest/miniconda.html"
+    exit 1
+fi
+
+print_status "Conda found"
+
+# Clone musubi-tuner if needed
 echo ""
-echo "Step 3: Setting up musubi-tuner repository..."
+echo "Setting up musubi-tuner repository..."
 if [ -d "musubi-tuner" ]; then
-    cd musubi-tuner
-    CURRENT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "none")
-    REQUIRED_COMMIT="d0a193061a23a51c90664282205d753605a641c1"
-    
-    if [ "$CURRENT_COMMIT" = "$REQUIRED_COMMIT" ]; then
-        print_status "musubi-tuner is already at the correct commit"
-    else
-        print_warning "musubi-tuner exists but at different commit"
-        echo "Current: $CURRENT_COMMIT"
-        echo "Required: $REQUIRED_COMMIT"
-        read -p "Switch to required commit? (y/N) " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            git fetch origin
-            git checkout feature-wan-2-2
-            git checkout $REQUIRED_COMMIT
-            print_status "Switched to required commit"
-        fi
-    fi
-    cd ..
+    print_status "musubi-tuner already exists"
 else
-    print_status "Cloning musubi-tuner repository..."
+    print_info "Cloning musubi-tuner..."
     git clone --recursive https://github.com/kohya-ss/musubi-tuner.git
     cd musubi-tuner
     git checkout feature-wan-2-2
     git checkout d0a193061a23a51c90664282205d753605a641c1
     cd ..
-    print_status "Repository cloned and checked out successfully"
+    print_status "Repository cloned"
 fi
 
-# Step 4: Check conda environment
-echo ""
-echo "Step 4: Setting up conda environment..."
+# Create/check conda environment
 ENV_NAME="wan22_lora"
+echo ""
+echo "Setting up conda environment..."
 
-# Initialize conda for bash if needed
-if ! command -v conda &> /dev/null; then
-    print_error "Conda not found. Please install miniconda or anaconda first."
-    exit 1
-fi
-
-# Check if conda environment exists
 if conda env list | grep -q "^${ENV_NAME} "; then
     print_status "Conda environment '${ENV_NAME}' already exists"
-    # Activate the environment
-    conda activate ${ENV_NAME}
-    print_status "Conda environment activated"
 else
-    print_status "Creating conda environment '${ENV_NAME}'..."
+    print_info "Creating conda environment '${ENV_NAME}'..."
     conda create -n ${ENV_NAME} python=3.10 -y
-    conda activate ${ENV_NAME}
-    print_status "Conda environment created and activated"
+    print_status "Environment created"
 fi
 
-# Set CONDA_PREFIX for consistent path usage
-CONDA_PREFIX="/root/miniconda3/envs/${ENV_NAME}"
-export CONDA_PREFIX
-
-# Step 5: Install CUDNN (for systems that support apt)
+# Install packages
 echo ""
-echo "Step 5: Checking CUDNN installation..."
-if command -v apt &> /dev/null && command -v sudo &> /dev/null; then
-    if dpkg -l | grep -q "libcudnn8.*8.9.7.29"; then
-        print_status "CUDNN 8.9.7.29 is already installed"
-    else
-        print_warning "Attempting to install CUDNN 8.9.7.29..."
-        sudo apt install -y libcudnn8=8.9.7.29-1+cuda12.2 libcudnn8-dev=8.9.7.29-1+cuda12.2 --allow-change-held-packages || {
-            print_warning "CUDNN installation failed. This is usually okay - PyTorch includes CUDNN."
-        }
-    fi
-else
-    print_info "Skipping CUDNN system package installation (not required for PyTorch 2.7+)"
-fi
+echo "Installing packages (this may take several minutes)..."
 
-# Step 6: Check PyTorch installation
-echo ""
-echo "Step 6: Checking PyTorch installation..."
+# Install PyTorch with CUDA
+print_info "Installing PyTorch 2.7.0..."
+conda run -n ${ENV_NAME} python -m pip install --timeout=120 torch==2.7.0 torchvision==0.22.0 xformers==0.0.30 --index-url https://download.pytorch.org/whl/cu128
+
+# Install musubi-tuner
+print_info "Installing musubi-tuner..."
 cd musubi-tuner
-
-# Re-activate conda environment after changing directory
-eval "$(conda shell.bash hook)"
-conda activate ${ENV_NAME}
-export PYTHONPATH="$PWD:$PYTHONPATH"
-
-# Check if PyTorch 2.7.0 is installed
-TORCH_INSTALLED=$($CONDA_PREFIX/bin/python -c "import torch; print(torch.__version__)" 2>/dev/null || echo "none")
-if [[ "$TORCH_INSTALLED" == "2.7.0"* ]]; then
-    print_status "PyTorch 2.7.0 is already installed"
-else
-    print_status "Installing PyTorch 2.7.0 and related packages..."
-    $CONDA_PREFIX/bin/python -m pip install --timeout=120 --retries=3 torch==2.7.0 torchvision==0.22.0 xformers==0.0.30 --index-url https://download.pytorch.org/whl/cu128
-fi
-
-# Step 7: Install musubi-tuner and dependencies
-echo ""
-echo "Step 7: Installing musubi-tuner and dependencies..."
-
-# Check if musubi-tuner is installed
-if $CONDA_PREFIX/bin/python -c "import musubi_tuner" 2>/dev/null; then
-    print_status "musubi-tuner is already installed"
-else
-    print_status "Installing musubi-tuner in editable mode..."
-    # Following AI_Characters' guide exactly
-    $CONDA_PREFIX/bin/python -m pip install -e .
-fi
-
-# Install protobuf and six separately
-print_status "Installing protobuf and six..."
-
-# Verify we're using the correct Python
-echo "Python executable: $CONDA_PREFIX/bin/python"
-echo "Python version: $($CONDA_PREFIX/bin/python --version)"
-echo "Site packages: $($CONDA_PREFIX/bin/python -m site | grep site-packages)"
-
-# Use conda to install protobuf (more reliable than pip)
-print_status "Installing protobuf using conda..."
-conda install -n ${ENV_NAME} protobuf -y
-
-# Install six using pip (not available in conda main channel)
-$CONDA_PREFIX/bin/python -m pip install six
-
-# Immediate verification
-$CONDA_PREFIX/bin/python -c "import protobuf; print('✓ protobuf imported successfully')" || print_error "protobuf import failed immediately after installation"
-
-# Step 8: Verify installation
-echo ""
-echo "Step 8: Verifying installation..."
-
-# Small delay to ensure all packages are properly installed
-sleep 2
-
-# Debug: Check which Python we're using
-echo "Using Python: $CONDA_PREFIX/bin/python"
-echo "Python version: $($CONDA_PREFIX/bin/python --version)"
-
-# Run verification with conda environment's python
-$CONDA_PREFIX/bin/python -c "
-import sys
-print('Python path:', sys.executable)
-print('sys.path (first 3):', sys.path[:3])
-
-try:
-    import torch
-    print(f'✓ PyTorch {torch.__version__} installed')
-    if torch.cuda.is_available():
-        print(f'✓ CUDA is available: {torch.cuda.get_device_name(0)}')
-    else:
-        print('✗ CUDA is not available')
-        sys.exit(1)
-    
-    import xformers
-    print(f'✓ xformers {xformers.__version__} installed')
-    
-    import musubi_tuner
-    print('✓ musubi-tuner installed')
-    
-    import protobuf
-    print('✓ protobuf installed')
-    
-except ImportError as e:
-    print(f'✗ Error: {e}')
-    sys.exit(1)
-"
-
-VERIFY_RESULT=$?
+conda run -n ${ENV_NAME} python -m pip install -e .
 cd ..
 
-if [ $VERIFY_RESULT -eq 0 ]; then
-    print_status "All dependencies verified successfully"
+# Install protobuf via conda (more reliable)
+print_info "Installing protobuf..."
+conda install -n ${ENV_NAME} protobuf -y
+
+# Create directories
+echo ""
+print_info "Creating directory structure..."
+mkdir -p musubi-tuner/{models/{diffusion_models,text_encoders,vae},output,logs}
+mkdir -p dataset/{images,videos}
+print_status "Directories created"
+
+# Final verification
+echo ""
+print_info "Verifying installation..."
+conda run -n ${ENV_NAME} python -c "
+import torch
+print(f'PyTorch: {torch.__version__}')
+if torch.cuda.is_available():
+    print(f'CUDA: Available ({torch.cuda.get_device_name(0)})')
+else:
+    print('CUDA: Not available')
+    exit(1)
+"
+
+if [ $? -eq 0 ]; then
+    print_status "Environment setup complete!"
 else
-    print_error "Some dependencies are missing"
+    print_error "Environment verification failed"
     exit 1
 fi
 
-# Step 9: Check and install aria2c
-echo ""
-echo "Step 9: Checking aria2c installation..."
-if ! command -v aria2c &> /dev/null; then
-    print_warning "aria2c not found. Installing..."
-    if command -v apt-get &> /dev/null; then
-        # Debian/Ubuntu
-        sudo apt-get update && sudo apt-get install -y aria2 || {
-            print_warning "Failed to install aria2c automatically"
-            echo "Please install manually:"
-            echo "  Ubuntu/Debian: sudo apt-get install aria2"
-            echo "  CentOS/RHEL: sudo yum install aria2"
-            echo "  MacOS: brew install aria2"
-        }
-    elif command -v yum &> /dev/null; then
-        # CentOS/RHEL
-        sudo yum install -y aria2 || {
-            print_warning "Failed to install aria2c automatically"
-            echo "Please install manually: sudo yum install aria2"
-        }
-    else
-        print_warning "Cannot install aria2c automatically"
-        echo "Please install aria2c manually for faster downloads:"
-        echo "  Ubuntu/Debian: sudo apt-get install aria2"
-        echo "  CentOS/RHEL: sudo yum install aria2"
-        echo "  MacOS: brew install aria2"
-    fi
-else
-    print_status "aria2c is already installed"
-fi
-
-# Step 10: Create necessary directories
-echo ""
-echo "Step 10: Creating directory structure..."
-mkdir -p musubi-tuner/{models/{diffusion_models,text_encoders,vae},output,logs}
-mkdir -p dataset/{images,videos,captions}
-print_status "Directory structure created"
-
-# Final summary
+# Summary
 echo ""
 echo "========================================="
 echo "Setup Complete!"
 echo "========================================="
 echo ""
-echo "Environment Summary:"
-echo "  - Python: $PYTHON_VERSION"
-echo "  - GPU: $GPU_NAME ($GPU_MEMORY MB)"
-echo "  - CUDA: $CUDA_VERSION"
-echo "  - PyTorch: 2.7.0"
-echo "  - aria2c: $(command -v aria2c &> /dev/null && echo "Installed" || echo "Not installed - please install manually")"
+echo "Next steps:"
+echo "1. Download models: ./download_models.sh"
+echo "2. Add training images to: dataset/images/"
+echo "3. Create caption files (.txt) for each image"
+echo "4. Run training: ./train_lora_simple.sh \"LoRA_Name\" \"trigger\""
 echo ""
-echo "IMPORTANT: You must manually activate the environment!"
-echo "  1. Run: conda activate wan22_lora"
-echo "  2. Run: conda install protobuf -y"
-echo "  3. Run: ./step1.5_activate_and_verify.sh --verify"
-echo ""
-echo "After activation, continue with:"
-echo "  1. Run ./step2_download_models.sh to download WAN2.2 models"
-echo "  2. Prepare your dataset in dataset/ directory"
-echo "  3. Run ./step3_prepare_dataset.sh to configure training"
-echo "  4. Run ./step4_train_wan22_lora.sh to start training"
-echo ""
-
-# Create activation script for future use
-cat > activate_env.sh << 'EOF'
-#!/bin/bash
-# Quick activation script for WAN2.2 training environment
-cd "$(dirname "${BASH_SOURCE[0]}")"
-eval "$(conda shell.bash hook)"
-conda activate wan22_lora
-echo "WAN2.2 conda environment activated"
-cd musubi-tuner
-EOF
-
-chmod +x activate_env.sh
-print_status "Created activate_env.sh for quick environment activation"
+echo "To verify environment anytime: ./verify_environment.sh"

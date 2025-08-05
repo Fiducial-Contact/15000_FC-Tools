@@ -1,0 +1,19 @@
+# WAN2.2 LoRA Training Dataset Configuration
+# Simplified configuration based on AI_Characters workflow
+
+[general]
+enable_bucket = true
+resolution = 768
+batch_size = 1
+
+[[datasets]]
+resolution = 768
+batch_size = 1
+keep_tokens = 1
+
+  [[datasets.subsets]]
+  image_dir = "./dataset/images"
+  caption_extension = ".txt"
+  num_repeats = 1
+  shuffle_caption = true
+  keep_tokens = 1
