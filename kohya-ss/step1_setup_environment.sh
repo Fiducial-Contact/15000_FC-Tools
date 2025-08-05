@@ -168,7 +168,7 @@ if [[ "$TORCH_INSTALLED" == "2.7.0"* ]]; then
     print_status "PyTorch 2.7.0 is already installed"
 else
     print_status "Installing PyTorch 2.7.0 and related packages..."
-    pip install torch==2.7.0 torchvision==0.22.0 xformers==0.0.30 --index-url https://download.pytorch.org/whl/cu128
+    python -m pip install torch==2.7.0 torchvision==0.22.0 xformers==0.0.30 --index-url https://download.pytorch.org/whl/cu128
 fi
 
 # Step 7: Install musubi-tuner and dependencies
@@ -180,12 +180,13 @@ if python -c "import musubi_tuner" 2>/dev/null; then
     print_status "musubi-tuner is already installed"
 else
     print_status "Installing musubi-tuner in editable mode..."
-    pip install -e .
+    python -m pip install -e .
 fi
 
 # Install additional required packages
 print_status "Installing additional dependencies..."
-pip install protobuf six
+echo "Using pip: $(which pip)"
+python -m pip install protobuf six
 
 # Step 8: Verify installation
 echo ""
