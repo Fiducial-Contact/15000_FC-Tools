@@ -162,6 +162,10 @@ echo ""
 echo "Step 6: Checking PyTorch installation..."
 cd musubi-tuner
 
+# Re-source the virtual environment after changing directory
+source venv/bin/activate
+export PYTHONPATH="$PWD:$PYTHONPATH"
+
 # Check if PyTorch 2.7.0 is installed
 TORCH_INSTALLED=$(python -c "import torch; print(torch.__version__)" 2>/dev/null || echo "none")
 if [[ "$TORCH_INSTALLED" == "2.7.0"* ]]; then
@@ -184,14 +188,21 @@ else
     python -m pip install -e .
 fi
 
-# Install protobuf and six separately (always do this to ensure they're installed)
+# Install protobuf and six separately
 print_status "Installing protobuf and six..."
-# Use the virtual environment's pip explicitly
-echo "Using pip: $(which pip)"
-echo "Python path: $(which python)"
-# Use python -m pip to ensure we're using the right environment
-python -m pip install protobuf
+
+# Verify we're using the correct Python
+echo "Python executable: $(which python)"
+echo "Python version: $(python --version)"
+echo "Site packages: $(python -m site --user-site)"
+
+# Force reinstall to ensure correct location
+python -m pip uninstall -y protobuf 2>/dev/null || true
+python -m pip install --force-reinstall protobuf
 python -m pip install six
+
+# Immediate verification
+python -c "import protobuf; print('✓ protobuf imported successfully')" || print_error "protobuf import failed immediately after installation"
 
 # Step 8: Verify installation
 echo ""
@@ -200,14 +211,19 @@ echo "Step 8: Verifying installation..."
 # Small delay to ensure all packages are properly installed
 sleep 2
 
-# Run verification (virtual environment is already activated from Step 4)
-# Debug: Check which Python we're using
-echo "Using Python: $(which python)"
-echo "Python version: $(python --version)"
+# Use the virtual environment's Python explicitly
+VENV_PYTHON="$PWD/venv/bin/python"
 
-# Run verification with the activated virtual environment's python
-python -c "
+# Debug: Check which Python we're using
+echo "Using Python: $VENV_PYTHON"
+echo "Python version: $($VENV_PYTHON --version)"
+
+# Run verification with explicit virtual environment's python
+$VENV_PYTHON -c "
 import sys
+print('Python path:', sys.executable)
+print('sys.path (first 3):', sys.path[:3])
+
 try:
     import torch
     print(f'✓ PyTorch {torch.__version__} installed')
