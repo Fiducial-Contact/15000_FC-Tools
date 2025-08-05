@@ -181,13 +181,17 @@ if python -c "import musubi_tuner" 2>/dev/null; then
 else
     print_status "Installing musubi-tuner in editable mode..."
     # Following AI_Characters' guide exactly
-    pip install -e .
+    python -m pip install -e .
 fi
 
 # Install protobuf and six separately (always do this to ensure they're installed)
 print_status "Installing protobuf and six..."
-pip install protobuf
-pip install six
+# Use the virtual environment's pip explicitly
+echo "Using pip: $(which pip)"
+echo "Python path: $(which python)"
+# Use python -m pip to ensure we're using the right environment
+python -m pip install protobuf
+python -m pip install six
 
 # Step 8: Verify installation
 echo ""
@@ -201,8 +205,8 @@ sleep 2
 echo "Using Python: $(which python)"
 echo "Python version: $(python --version)"
 
-# Run verification with explicit python from venv
-"$SCRIPT_DIR/$VENV_DIR/bin/python" -c "
+# Run verification with the activated virtual environment's python
+python -c "
 import sys
 try:
     import torch
