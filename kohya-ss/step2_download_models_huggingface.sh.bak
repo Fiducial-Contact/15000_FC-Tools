@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# WAN2.2 Model Download Script using aria2c
+# WAN2.2 Model Download Script
 # Downloads all required models for WAN2.2 LoRA training
-# Uses aria2c for better download performance and SSL handling
+# Includes integrity checking and resume support
 
 set -e
 
 echo "========================================="
-echo "WAN2.2 Model Download Script (aria2c)"
+echo "WAN2.2 Model Download Script"
 echo "========================================="
 echo ""
 
@@ -39,12 +39,10 @@ print_info() {
     echo -e "${BLUE}[i]${NC} $1"
 }
 
-# Check if aria2c is installed
-if ! command -v aria2c &> /dev/null; then
-    print_error "aria2c not found. Please install it first:"
-    echo "  Ubuntu/Debian: sudo apt-get install aria2"
-    echo "  MacOS: brew install aria2"
-    exit 1
+# Check if huggingface-cli is installed
+if ! command -v huggingface-cli &> /dev/null; then
+    print_warning "huggingface-cli not found. Installing..."
+    pip install huggingface-hub
 fi
 
 # Model directory
@@ -69,42 +67,34 @@ check_model() {
     fi
 }
 
-# Function to download with aria2c
-download_with_aria2c() {
-    local url=$1
-    local output_path=$2
-    local expected_size=$3
-    local description=$4
+# Function to download with progress
+download_model() {
+    local repo_id=$1
+    local filename=$2
+    local local_dir=$3
+    local expected_size=$4
+    local description=$5
+    
+    local full_path="$local_dir/$filename"
     
     echo ""
     print_info "Checking $description..."
     
-    if check_model "$output_path" "$expected_size"; then
+    if check_model "$full_path" "$expected_size"; then
         print_status "$description already downloaded"
         return 0
     fi
     
     print_info "Downloading $description..."
-    print_info "Using aria2c for multi-threaded download"
+    print_info "This may take some time depending on your internet speed"
     
-    # Create directory if needed
-    local output_dir=$(dirname "$output_path")
-    mkdir -p "$output_dir"
+    # Use huggingface-cli for reliable downloads with resume support
+    huggingface-cli download "$repo_id" "$filename" \
+        --local-dir "$local_dir" \
+        --local-dir-use-symlinks False \
+        --resume-download
     
-    # Download with aria2c
-    # -x16 : 16 connections
-    # -s16 : 16 splits
-    # -k1M : 1MB chunk size
-    # --check-certificate=false : Skip SSL verification (like your previous success)
-    aria2c -x16 -s16 -k1M \
-        --check-certificate=false \
-        --file-allocation=none \
-        --continue=true \
-        --dir="$output_dir" \
-        --out="$(basename "$output_path")" \
-        "$url"
-    
-    if check_model "$output_path" "$expected_size"; then
+    if check_model "$full_path" "$expected_size"; then
         print_status "$description downloaded successfully"
     else
         print_error "Failed to download $description"
@@ -117,37 +107,35 @@ echo "Starting model downloads..."
 echo "Total download size: ~30GB"
 echo ""
 
-# Model URLs
-T5_URL="https://huggingface.co/Wan-AI/Wan2.1-I2V-14B-720P/resolve/main/models_t5_umt5-xxl-enc-bf16.pth"
-VAE_URL="https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors"
-HIGH_NOISE_URL="https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_t2v_high_noise_14B_fp16.safetensors"
-LOW_NOISE_URL="https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp16.safetensors"
-
 # 1. T5 Text Encoder (UMT5-XXL)
-download_with_aria2c \
-    "$T5_URL" \
-    "$MODEL_DIR/text_encoders/models_t5_umt5-xxl-enc-bf16.pth" \
+download_model \
+    "Wan-AI/Wan2.1-I2V-14B-720P" \
+    "models_t5_umt5-xxl-enc-bf16.pth" \
+    "$MODEL_DIR/text_encoders" \
     4700 \
     "T5 Text Encoder (UMT5-XXL)"
 
 # 2. VAE Model
-download_with_aria2c \
-    "$VAE_URL" \
-    "$MODEL_DIR/vae/wan_2.1_vae.safetensors" \
+download_model \
+    "Comfy-Org/Wan_2.1_ComfyUI_repackaged" \
+    "split_files/vae/wan_2.1_vae.safetensors" \
+    "$MODEL_DIR/vae" \
     650 \
     "WAN 2.1 VAE Model"
 
 # 3. WAN2.2 High Noise Model
-download_with_aria2c \
-    "$HIGH_NOISE_URL" \
-    "$MODEL_DIR/diffusion_models/wan2.2_t2v_high_noise_14B_fp16.safetensors" \
+download_model \
+    "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" \
+    "split_files/diffusion_models/wan2.2_t2v_high_noise_14B_fp16.safetensors" \
+    "$MODEL_DIR/diffusion_models" \
     13000 \
     "WAN2.2 High Noise Model (14B FP16)"
 
 # 4. WAN2.2 Low Noise Model
-download_with_aria2c \
-    "$LOW_NOISE_URL" \
-    "$MODEL_DIR/diffusion_models/wan2.2_t2v_low_noise_14B_fp16.safetensors" \
+download_model \
+    "Comfy-Org/Wan_2.2_ComfyUI_Repackaged" \
+    "split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp16.safetensors" \
+    "$MODEL_DIR/diffusion_models" \
     13000 \
     "WAN2.2 Low Noise Model (14B FP16)"
 
@@ -162,9 +150,9 @@ cat > model_paths.sh << EOF
 
 export WAN22_MODELS_DIR="$SCRIPT_DIR/$MODEL_DIR"
 export WAN22_T5_MODEL="\$WAN22_MODELS_DIR/text_encoders/models_t5_umt5-xxl-enc-bf16.pth"
-export WAN22_VAE_MODEL="\$WAN22_MODELS_DIR/vae/wan_2.1_vae.safetensors"
-export WAN22_HIGH_NOISE_MODEL="\$WAN22_MODELS_DIR/diffusion_models/wan2.2_t2v_high_noise_14B_fp16.safetensors"
-export WAN22_LOW_NOISE_MODEL="\$WAN22_MODELS_DIR/diffusion_models/wan2.2_t2v_low_noise_14B_fp16.safetensors"
+export WAN22_VAE_MODEL="\$WAN22_MODELS_DIR/vae/split_files/vae/wan_2.1_vae.safetensors"
+export WAN22_HIGH_NOISE_MODEL="\$WAN22_MODELS_DIR/diffusion_models/split_files/diffusion_models/wan2.2_t2v_high_noise_14B_fp16.safetensors"
+export WAN22_LOW_NOISE_MODEL="\$WAN22_MODELS_DIR/diffusion_models/split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp16.safetensors"
 
 echo "Model paths loaded:"
 echo "  T5: \$WAN22_T5_MODEL"
@@ -191,21 +179,21 @@ else
     all_good=false
 fi
 
-if check_model "$MODEL_DIR/vae/wan_2.1_vae.safetensors" 650; then
+if check_model "$MODEL_DIR/vae/split_files/vae/wan_2.1_vae.safetensors" 650; then
     print_status "VAE Model: OK"
 else
     print_error "VAE Model: Missing or incomplete"
     all_good=false
 fi
 
-if check_model "$MODEL_DIR/diffusion_models/wan2.2_t2v_high_noise_14B_fp16.safetensors" 13000; then
+if check_model "$MODEL_DIR/diffusion_models/split_files/diffusion_models/wan2.2_t2v_high_noise_14B_fp16.safetensors" 13000; then
     print_status "High Noise Model: OK"
 else
     print_error "High Noise Model: Missing or incomplete"
     all_good=false
 fi
 
-if check_model "$MODEL_DIR/diffusion_models/wan2.2_t2v_low_noise_14B_fp16.safetensors" 13000; then
+if check_model "$MODEL_DIR/diffusion_models/split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp16.safetensors" 13000; then
     print_status "Low Noise Model: OK"
 else
     print_error "Low Noise Model: Missing or incomplete"
@@ -224,12 +212,13 @@ if [ "$all_good" = true ]; then
     echo "  ├── text_encoders/"
     echo "  │   └── models_t5_umt5-xxl-enc-bf16.pth"
     echo "  ├── vae/"
-    echo "  │   └── wan_2.1_vae.safetensors"
+    echo "  │   └── split_files/vae/wan_2.1_vae.safetensors"
     echo "  └── diffusion_models/"
-    echo "      ├── wan2.2_t2v_high_noise_14B_fp16.safetensors"
-    echo "      └── wan2.2_t2v_low_noise_14B_fp16.safetensors"
+    echo "      └── split_files/diffusion_models/"
+    echo "          ├── wan2.2_t2v_high_noise_14B_fp16.safetensors"
+    echo "          └── wan2.2_t2v_low_noise_14B_fp16.safetensors"
     echo ""
-    echo "Next step: Prepare your dataset and run ./step3_prepare_dataset.sh"
+    echo "Next step: Prepare your dataset and run ./prepare_dataset.sh"
 else
     echo "Some models are missing!"
     echo "========================================="
