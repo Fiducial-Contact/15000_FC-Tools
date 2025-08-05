@@ -93,7 +93,15 @@ download_model() {
                --file-allocation=none --continue=true \
                --dir="$dir" --out="$filename" "$url"
     else
-        wget -c -O "$filepath" "$url"
+        # Use curl as fallback (available on macOS by default)
+        if command -v wget &> /dev/null; then
+            wget -c -O "$filepath" "$url"
+        elif command -v curl &> /dev/null; then
+            curl -L -C - -o "$filepath" "$url"
+        else
+            print_error "Neither wget nor curl found. Please install one of them."
+            return 1
+        fi
     fi
 }
 
@@ -157,4 +165,4 @@ echo ""
 echo "Next steps:"
 echo "1. Add training images to: dataset/images/"
 echo "2. Create caption files (.txt) for each image"
-echo "3. Run training: ./train_lora_simple.sh \"LoRA_Name\" \"trigger\""
+echo "3. Run training: ./train_lora.sh \"LoRA_Name\" \"trigger\""

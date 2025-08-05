@@ -2,7 +2,7 @@
 
 # WAN2.2 LoRA Training Script - Simplified Version
 # Combines functionality from multiple scripts for easier use
-# Usage: ./train_lora_simple.sh "LoRA_Name" "trigger phrase" [author_name]
+# Usage: ./train_lora.sh "LoRA_Name" "trigger phrase" [author_name]
 
 set -e
 

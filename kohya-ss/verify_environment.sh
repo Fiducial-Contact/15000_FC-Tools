@@ -106,7 +106,7 @@ if [ $exit_code -eq 0 ]; then
     print_status "All checks passed!"
     echo ""
     echo "You can now run training with:"
-    echo "  ./train_lora_simple.sh \"LoRA_Name\" \"trigger phrase\""
+    echo "  ./train_lora.sh \"LoRA_Name\" \"trigger phrase\""
 else
     echo ""
     print_error "Environment check failed!"
