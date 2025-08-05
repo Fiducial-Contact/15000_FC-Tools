@@ -222,6 +222,25 @@ if ! run_step 1 "Environment Setup" "step1_setup_environment.sh" \
     exit 1
 fi
 
+# Step 1.5: Manual Environment Activation
+echo ""
+echo "========================================="
+echo "Step 1.5: Manual Environment Activation Required"
+echo "========================================="
+print_warning "IMPORTANT: You must manually activate the conda environment!"
+echo ""
+echo "Please run these commands in your terminal:"
+echo ""
+print_info "1. conda activate wan22_lora"
+print_info "2. conda install protobuf -y"
+print_info "3. ./step1.5_activate_and_verify.sh --verify"
+echo ""
+echo "After completing these steps, run this script again with:"
+echo "  $0 --start-from 2"
+echo ""
+read -p "Press Enter to acknowledge and exit (you'll need to activate manually)..." 
+exit 0
+
 # Step 2: Download Models
 if ! run_step 2 "Download Models" "step2_download_models.sh" \
     "This will download all required WAN2.2 models (~30GB)"; then
