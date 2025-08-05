@@ -51,52 +51,99 @@ fi
 MODEL_DIR="musubi-tuner/models"
 mkdir -p "$MODEL_DIR"/{diffusion_models,text_encoders,vae}
 
+# Function to check file existence and size before adding to download list
+check_and_add_to_list() {
+    local url=$1
+    local dir=$2
+    local filename=$3
+    local expected_size=$4
+    local description=$5
+    
+    local filepath="$dir/$filename"
+    
+    if [ -f "$filepath" ]; then
+        local file_size=$(du -m "$filepath" | cut -f1)
+        if [ "$file_size" -ge "$expected_size" ]; then
+            print_status "$description already exists (${file_size}MB) - skipping"
+            return
+        else
+            print_warning "$description incomplete (${file_size}MB, expected >${expected_size}MB) - will redownload"
+        fi
+    else
+        print_info "$description not found - will download"
+    fi
+    
+    # Add to download list
+    echo -e "$url\n\tdir=$dir\n\tout=$filename\n" >> "$DOWNLOAD_LIST"
+}
+
 # Create download list file
 DOWNLOAD_LIST="$SCRIPT_DIR/download_list.txt"
 rm -f "$DOWNLOAD_LIST"
 
-# Model URLs and paths
-cat > "$DOWNLOAD_LIST" << EOF
-https://huggingface.co/Wan-AI/Wan2.1-I2V-14B-720P/resolve/main/models_t5_umt5-xxl-enc-bf16.pth
-	dir=$MODEL_DIR/text_encoders
-	out=models_t5_umt5-xxl-enc-bf16.pth
-
-https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors
-	dir=$MODEL_DIR/vae
-	out=wan_2.1_vae.safetensors
-
-https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_t2v_high_noise_14B_fp16.safetensors
-	dir=$MODEL_DIR/diffusion_models
-	out=wan2.2_t2v_high_noise_14B_fp16.safetensors
-
-https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp16.safetensors
-	dir=$MODEL_DIR/diffusion_models
-	out=wan2.2_t2v_low_noise_14B_fp16.safetensors
-EOF
-
-echo "Starting parallel downloads..."
-echo "Total download size: ~30GB"
-echo ""
-print_info "Downloading all models simultaneously for maximum speed"
+echo "Checking existing files..."
 echo ""
 
-# Download all files in parallel with aria2c
-# Optimized settings for maximum speed:
-aria2c \
-    --input-file="$DOWNLOAD_LIST" \
-    --max-concurrent-downloads=4 \
-    --split=16 \
-    --max-connection-per-server=16 \
-    --min-split-size=1M \
-    --check-certificate=false \
-    --file-allocation=none \
-    --continue=true \
-    --auto-file-renaming=false \
-    --allow-overwrite=true \
-    --console-log-level=info \
-    --summary-interval=5 \
-    --download-result=full \
-    --human-readable=true
+# Check each model and add to download list if needed
+check_and_add_to_list \
+    "https://huggingface.co/Wan-AI/Wan2.1-I2V-14B-720P/resolve/main/models_t5_umt5-xxl-enc-bf16.pth" \
+    "$MODEL_DIR/text_encoders" \
+    "models_t5_umt5-xxl-enc-bf16.pth" \
+    4700 \
+    "T5 Text Encoder"
+
+check_and_add_to_list \
+    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors" \
+    "$MODEL_DIR/vae" \
+    "wan_2.1_vae.safetensors" \
+    650 \
+    "VAE Model"
+
+check_and_add_to_list \
+    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_t2v_high_noise_14B_fp16.safetensors" \
+    "$MODEL_DIR/diffusion_models" \
+    "wan2.2_t2v_high_noise_14B_fp16.safetensors" \
+    13000 \
+    "High Noise Model"
+
+check_and_add_to_list \
+    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp16.safetensors" \
+    "$MODEL_DIR/diffusion_models" \
+    "wan2.2_t2v_low_noise_14B_fp16.safetensors" \
+    13000 \
+    "Low Noise Model"
+
+# Check if download list is empty
+if [ ! -s "$DOWNLOAD_LIST" ]; then
+    echo ""
+    print_status "All models are already downloaded!"
+    echo ""
+else
+    echo ""
+    echo "Starting parallel downloads..."
+    echo "Downloading missing/incomplete files..."
+    echo ""
+    print_info "Downloading files simultaneously for maximum speed"
+    echo ""
+
+    # Download all files in parallel with aria2c
+    # Optimized settings for maximum speed:
+    aria2c \
+        --input-file="$DOWNLOAD_LIST" \
+        --max-concurrent-downloads=4 \
+        --split=16 \
+        --max-connection-per-server=16 \
+        --min-split-size=1M \
+        --check-certificate=false \
+        --file-allocation=none \
+        --continue=true \
+        --auto-file-renaming=false \
+        --allow-overwrite=true \
+        --console-log-level=info \
+        --summary-interval=5 \
+        --download-result=full \
+        --human-readable=true
+fi
 
 # Clean up
 rm -f "$DOWNLOAD_LIST"
