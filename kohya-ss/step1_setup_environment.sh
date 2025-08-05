@@ -6,6 +6,13 @@
 
 set -e
 
+# Initialize conda for this script
+if [ -f "/root/miniconda3/etc/profile.d/conda.sh" ]; then
+    source "/root/miniconda3/etc/profile.d/conda.sh"
+else
+    export PATH="/root/miniconda3/bin:$PATH"
+fi
+
 echo "========================================="
 echo "WAN2.2 LoRA Training Environment Setup"
 echo "========================================="
@@ -129,16 +136,18 @@ fi
 if conda env list | grep -q "^${ENV_NAME} "; then
     print_status "Conda environment '${ENV_NAME}' already exists"
     # Activate the environment
-    eval "$(conda shell.bash hook)"
     conda activate ${ENV_NAME}
     print_status "Conda environment activated"
 else
     print_status "Creating conda environment '${ENV_NAME}'..."
     conda create -n ${ENV_NAME} python=3.10 -y
-    eval "$(conda shell.bash hook)"
     conda activate ${ENV_NAME}
     print_status "Conda environment created and activated"
 fi
+
+# Set CONDA_PREFIX for consistent path usage
+CONDA_PREFIX="/root/miniconda3/envs/${ENV_NAME}"
+export CONDA_PREFIX
 
 # Step 5: Install CUDNN (for systems that support apt)
 echo ""
@@ -167,12 +176,12 @@ conda activate ${ENV_NAME}
 export PYTHONPATH="$PWD:$PYTHONPATH"
 
 # Check if PyTorch 2.7.0 is installed
-TORCH_INSTALLED=$(python -c "import torch; print(torch.__version__)" 2>/dev/null || echo "none")
+TORCH_INSTALLED=$($CONDA_PREFIX/bin/python -c "import torch; print(torch.__version__)" 2>/dev/null || echo "none")
 if [[ "$TORCH_INSTALLED" == "2.7.0"* ]]; then
     print_status "PyTorch 2.7.0 is already installed"
 else
     print_status "Installing PyTorch 2.7.0 and related packages..."
-    python -m pip install --timeout=120 --retries=3 torch==2.7.0 torchvision==0.22.0 xformers==0.0.30 --index-url https://download.pytorch.org/whl/cu128
+    $CONDA_PREFIX/bin/python -m pip install --timeout=120 --retries=3 torch==2.7.0 torchvision==0.22.0 xformers==0.0.30 --index-url https://download.pytorch.org/whl/cu128
 fi
 
 # Step 7: Install musubi-tuner and dependencies
@@ -180,29 +189,31 @@ echo ""
 echo "Step 7: Installing musubi-tuner and dependencies..."
 
 # Check if musubi-tuner is installed
-if python -c "import musubi_tuner" 2>/dev/null; then
+if $CONDA_PREFIX/bin/python -c "import musubi_tuner" 2>/dev/null; then
     print_status "musubi-tuner is already installed"
 else
     print_status "Installing musubi-tuner in editable mode..."
     # Following AI_Characters' guide exactly
-    python -m pip install -e .
+    $CONDA_PREFIX/bin/python -m pip install -e .
 fi
 
 # Install protobuf and six separately
 print_status "Installing protobuf and six..."
 
 # Verify we're using the correct Python
-echo "Python executable: $(which python)"
-echo "Python version: $(python --version)"
-echo "Site packages: $(python -m site --user-site)"
+echo "Python executable: $CONDA_PREFIX/bin/python"
+echo "Python version: $($CONDA_PREFIX/bin/python --version)"
+echo "Site packages: $($CONDA_PREFIX/bin/python -m site | grep site-packages)"
 
-# Force reinstall to ensure correct location
-python -m pip uninstall -y protobuf 2>/dev/null || true
-python -m pip install --force-reinstall protobuf
-python -m pip install six
+# Use conda to install protobuf (more reliable than pip)
+print_status "Installing protobuf using conda..."
+conda install -n ${ENV_NAME} protobuf -y
+
+# Install six using pip (not available in conda main channel)
+$CONDA_PREFIX/bin/python -m pip install six
 
 # Immediate verification
-python -c "import protobuf; print('✓ protobuf imported successfully')" || print_error "protobuf import failed immediately after installation"
+$CONDA_PREFIX/bin/python -c "import protobuf; print('✓ protobuf imported successfully')" || print_error "protobuf import failed immediately after installation"
 
 # Step 8: Verify installation
 echo ""
@@ -212,11 +223,11 @@ echo "Step 8: Verifying installation..."
 sleep 2
 
 # Debug: Check which Python we're using
-echo "Using Python: $(which python)"
-echo "Python version: $(python --version)"
+echo "Using Python: $CONDA_PREFIX/bin/python"
+echo "Python version: $($CONDA_PREFIX/bin/python --version)"
 
 # Run verification with conda environment's python
-python -c "
+$CONDA_PREFIX/bin/python -c "
 import sys
 print('Python path:', sys.executable)
 print('sys.path (first 3):', sys.path[:3])
