@@ -139,17 +139,17 @@ fi
 # Step 5: Install CUDNN (for systems that support apt)
 echo ""
 echo "Step 5: Checking CUDNN installation..."
-if command -v apt &> /dev/null; then
+if command -v apt &> /dev/null && command -v sudo &> /dev/null; then
     if dpkg -l | grep -q "libcudnn8.*8.9.7.29"; then
         print_status "CUDNN 8.9.7.29 is already installed"
     else
-        print_warning "Installing CUDNN 8.9.7.29..."
+        print_warning "Attempting to install CUDNN 8.9.7.29..."
         sudo apt install -y libcudnn8=8.9.7.29-1+cuda12.2 libcudnn8-dev=8.9.7.29-1+cuda12.2 --allow-change-held-packages || {
-            print_warning "CUDNN installation failed. This may be okay on non-Ubuntu systems."
+            print_warning "CUDNN installation failed. This is usually okay - PyTorch includes CUDNN."
         }
     fi
 else
-    print_warning "apt not found. Please ensure CUDNN is installed manually if needed."
+    print_info "Skipping CUDNN system package installation (not required for PyTorch 2.7+)"
 fi
 
 # Step 6: Check PyTorch installation
@@ -185,6 +185,11 @@ pip install protobuf six
 # Step 8: Verify installation
 echo ""
 echo "Step 8: Verifying installation..."
+
+# Run verification in the virtual environment
+cd musubi-tuner
+source venv/bin/activate
+
 python -c "
 import sys
 try:
@@ -210,14 +215,15 @@ except ImportError as e:
     sys.exit(1)
 "
 
-if [ $? -eq 0 ]; then
+VERIFY_RESULT=$?
+cd ..
+
+if [ $VERIFY_RESULT -eq 0 ]; then
     print_status "All dependencies verified successfully"
 else
     print_error "Some dependencies are missing"
     exit 1
 fi
-
-cd ..
 
 # Step 9: Create necessary directories
 echo ""
