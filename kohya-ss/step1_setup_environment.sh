@@ -114,31 +114,30 @@ else
     print_status "Repository cloned and checked out successfully"
 fi
 
-# Step 4: Check virtual environment
+# Step 4: Check conda environment
 echo ""
-echo "Step 4: Setting up Python virtual environment..."
-VENV_DIR="musubi-tuner/venv"
+echo "Step 4: Setting up conda environment..."
+ENV_NAME="wan22_lora"
 
-if [ -d "$VENV_DIR" ]; then
-    print_status "Virtual environment already exists"
-    # Check if it's valid
-    if [ -f "$VENV_DIR/bin/activate" ]; then
-        source "$VENV_DIR/bin/activate"
-        print_status "Virtual environment activated"
-    else
-        print_warning "Virtual environment seems corrupted, recreating..."
-        rm -rf "$VENV_DIR"
-        cd musubi-tuner
-        python3 -m venv venv
-        source venv/bin/activate
-        cd ..
-    fi
+# Initialize conda for bash if needed
+if ! command -v conda &> /dev/null; then
+    print_error "Conda not found. Please install miniconda or anaconda first."
+    exit 1
+fi
+
+# Check if conda environment exists
+if conda env list | grep -q "^${ENV_NAME} "; then
+    print_status "Conda environment '${ENV_NAME}' already exists"
+    # Activate the environment
+    eval "$(conda shell.bash hook)"
+    conda activate ${ENV_NAME}
+    print_status "Conda environment activated"
 else
-    cd musubi-tuner
-    python3 -m venv venv
-    source venv/bin/activate
-    cd ..
-    print_status "Virtual environment created and activated"
+    print_status "Creating conda environment '${ENV_NAME}'..."
+    conda create -n ${ENV_NAME} python=3.10 -y
+    eval "$(conda shell.bash hook)"
+    conda activate ${ENV_NAME}
+    print_status "Conda environment created and activated"
 fi
 
 # Step 5: Install CUDNN (for systems that support apt)
@@ -162,8 +161,9 @@ echo ""
 echo "Step 6: Checking PyTorch installation..."
 cd musubi-tuner
 
-# Re-source the virtual environment after changing directory
-source venv/bin/activate
+# Re-activate conda environment after changing directory
+eval "$(conda shell.bash hook)"
+conda activate ${ENV_NAME}
 export PYTHONPATH="$PWD:$PYTHONPATH"
 
 # Check if PyTorch 2.7.0 is installed
@@ -211,15 +211,12 @@ echo "Step 8: Verifying installation..."
 # Small delay to ensure all packages are properly installed
 sleep 2
 
-# Use the virtual environment's Python explicitly
-VENV_PYTHON="$PWD/venv/bin/python"
-
 # Debug: Check which Python we're using
-echo "Using Python: $VENV_PYTHON"
-echo "Python version: $($VENV_PYTHON --version)"
+echo "Using Python: $(which python)"
+echo "Python version: $(python --version)"
 
-# Run verification with explicit virtual environment's python
-$VENV_PYTHON -c "
+# Run verification with conda environment's python
+python -c "
 import sys
 print('Python path:', sys.executable)
 print('sys.path (first 3):', sys.path[:3])
@@ -288,8 +285,9 @@ cat > activate_env.sh << 'EOF'
 #!/bin/bash
 # Quick activation script for WAN2.2 training environment
 cd "$(dirname "${BASH_SOURCE[0]}")"
-source musubi-tuner/venv/bin/activate
-echo "WAN2.2 training environment activated"
+eval "$(conda shell.bash hook)"
+conda activate wan22_lora
+echo "WAN2.2 conda environment activated"
 cd musubi-tuner
 EOF
 

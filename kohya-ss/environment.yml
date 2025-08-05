@@ -1,0 +1,36 @@
+# WAN2.2 LoRA Training Environment
+# This file can be used to recreate the conda environment
+# Usage: conda env create -f environment.yml
+
+name: wan22_lora
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+  
+dependencies:
+  # Python version
+  - python=3.10
+  
+  # PyTorch and related packages
+  - pytorch=2.7.0
+  - torchvision=0.22.0
+  - pytorch-cuda=12.8
+  
+  # Essential tools
+  - pip
+  - git
+  
+  # Install remaining packages via pip
+  - pip:
+    # XFormers for efficient attention
+    - xformers==0.0.30
+    
+    # Google packages
+    - protobuf
+    - six
+    
+    # musubi-tuner will be installed in editable mode
+    # Run: pip install -e ./musubi-tuner
+    # after creating the environment

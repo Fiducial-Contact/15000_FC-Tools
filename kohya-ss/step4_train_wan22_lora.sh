@@ -129,14 +129,16 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Check environment
-if [ ! -d "musubi-tuner/venv" ]; then
-    print_error "Virtual environment not found. Please run ./setup_environment.sh first"
+ENV_NAME="wan22_lora"
+if ! conda env list | grep -q "^${ENV_NAME} "; then
+    print_error "Conda environment '${ENV_NAME}' not found. Please run ./step1_setup_environment.sh first"
     exit 1
 fi
 
 # Activate environment
-print_info "Activating virtual environment..."
-source musubi-tuner/venv/bin/activate
+print_info "Activating conda environment..."
+eval "$(conda shell.bash hook)"
+conda activate ${ENV_NAME}
 
 # Check for models
 if [ ! -f "model_paths.sh" ]; then
