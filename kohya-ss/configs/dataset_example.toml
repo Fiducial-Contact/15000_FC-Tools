@@ -1,0 +1,86 @@
+# WAN2.2 Dataset Configuration Example
+# This file demonstrates various dataset configuration options
+
+[general]
+# Enable different types of datasets
+enable_image_datasets = true
+enable_video_datasets = false  # Set to true if you have videos
+
+# Global settings
+resolution = 768  # or 1024 for higher quality
+batch_size = 1    # Increase if you have more VRAM
+enable_bucket = true
+bucket_no_upscale = false
+
+# Augmentation settings (optional)
+color_aug = false
+flip_aug = false
+random_crop = false
+
+# Image Dataset Configuration
+[[image_datasets]]
+# Directory containing your images and captions
+directory = "../dataset/images"
+
+# Number of times to repeat the dataset per epoch
+# Use higher values for smaller datasets
+num_repeats = 5  # 10-20 for <50 images, 5-10 for 50-100 images, 1-5 for >100 images
+
+# Caption settings
+caption_extension = ".txt"
+shuffle_caption = true
+keep_tokens_separator = ","
+
+# Optional: Token replacement
+# token_replacement = { "old_token" = "new_token" }
+
+# Optional: Conditional dropout (helps generalization)
+# caption_dropout_rate = 0.1
+# caption_dropout_every_n_epochs = 0
+# caption_tag_dropout_rate = 0.1
+
+# Video Dataset Configuration (if applicable)
+[[video_datasets]]
+directory = "../dataset/videos"
+num_repeats = 5
+
+# Video-specific settings
+caption_extension = ".txt"
+frame_extraction_method = "uniform"  # or "keyframe"
+max_frames = 24
+fps = 8
+shuffle_caption = true
+
+# Multiple Dataset Example
+# You can have multiple image or video datasets
+# [[image_datasets]]
+# directory = "../dataset/style1"
+# num_repeats = 3
+# 
+# [[image_datasets]]
+# directory = "../dataset/style2"
+# num_repeats = 5
+
+# Advanced Options
+[advanced]
+# Cache settings (speeds up training)
+cache_latents = true
+cache_latents_to_disk = true
+cache_text_encoder_outputs = true
+
+# Resolution override per dataset
+# [[image_datasets]]
+# directory = "../dataset/highres"
+# resolution = 1024
+# 
+# [[image_datasets]]
+# directory = "../dataset/lowres"
+# resolution = 512
+
+# Aspect ratio bucketing
+bucket_reso_steps = 64
+bucket_no_upscale = false
+
+# Noise offset (experimental, can improve dark/bright images)
+# noise_offset = 0.1
+# adaptive_noise_scale = 0.0

@@ -1,0 +1,98 @@
+# WAN2.2 LoRA Training Configuration Template
+# Based on AI_Characters' recommended settings
+# Copy and modify this file for your specific training needs
+
+[model]
+# Model architecture
+task = "t2v-A14B"
+network_module = "networks.lora_wan"
+
+# Network settings (recommended: dim=16, alpha=16)
+network_dim = 16
+network_alpha = 16
+
+# Model precision
+mixed_precision = "fp16"
+fp8_base = true
+
+[training]
+# Learning rate (recommended: 3e-4)
+learning_rate = 3e-4
+
+# Optimizer settings
+optimizer_type = "adamw"
+optimizer_args = { weight_decay = 0.1 }
+max_grad_norm = 0
+
+# Learning rate scheduler
+lr_scheduler = "polynomial"
+lr_scheduler_power = 8
+lr_scheduler_min_lr_ratio = "5e-5"
+
+# Training duration
+max_train_epochs = 100
+save_every_n_epochs = 100
+
+# Batch settings
+batch_size = 1
+gradient_accumulation_steps = 1
+max_data_loader_n_workers = 2
+
+# Timestep sampling
+timestep_sampling = "shift"
+discrete_flow_shift = 1.0
+
+# For high-noise model
+# min_timestep = 875
+# max_timestep = 1000
+
+# For low-noise model
+# min_timestep = 0
+# max_timestep = 875
+
+# Other settings
+seed = 5
+gradient_checkpointing = true
+preserve_distribution_shape = true
+
+[memory_optimization]
+# Enable xformers for memory efficiency
+xformers = true
+
+# For 16GB GPUs, uncomment the following:
+# blocks_to_swap = 20
+
+# For cached latents (speeds up training)
+# cache_latents = true
+# cache_text_encoder_outputs = true
+
+[dataset]
+# Dataset configuration file
+dataset_config = "../dataset/dataset.toml"
+
+# Resolution (recommended: 768 or 1024)
+resolution = 768
+
+# Enable bucketing for mixed aspect ratios
+enable_bucket = true
+bucket_no_upscale = false
+
+[output]
+# Output directory
+output_dir = "../output"
+
+# Metadata
+metadata_author = "YourName"
+metadata_license = ""
+metadata_tags = "wan2.2, lora, style"
+
+[logging]
+# Logging settings
+log_prefix = "wan22_lora"
+log_every_n_steps = 10
+log_with = "tensorboard"
+
+# Wandb settings (optional)
+# wandb_api_key = "your_api_key"
+# wandb_project = "wan22-lora-training"
+# wandb_run_name = "my-lora-run"
