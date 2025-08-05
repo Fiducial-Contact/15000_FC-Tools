@@ -265,9 +265,40 @@ else
     exit 1
 fi
 
-# Step 9: Create necessary directories
+# Step 9: Check and install aria2c
 echo ""
-echo "Step 9: Creating directory structure..."
+echo "Step 9: Checking aria2c installation..."
+if ! command -v aria2c &> /dev/null; then
+    print_warning "aria2c not found. Installing..."
+    if command -v apt-get &> /dev/null; then
+        # Debian/Ubuntu
+        sudo apt-get update && sudo apt-get install -y aria2 || {
+            print_warning "Failed to install aria2c automatically"
+            echo "Please install manually:"
+            echo "  Ubuntu/Debian: sudo apt-get install aria2"
+            echo "  CentOS/RHEL: sudo yum install aria2"
+            echo "  MacOS: brew install aria2"
+        }
+    elif command -v yum &> /dev/null; then
+        # CentOS/RHEL
+        sudo yum install -y aria2 || {
+            print_warning "Failed to install aria2c automatically"
+            echo "Please install manually: sudo yum install aria2"
+        }
+    else
+        print_warning "Cannot install aria2c automatically"
+        echo "Please install aria2c manually for faster downloads:"
+        echo "  Ubuntu/Debian: sudo apt-get install aria2"
+        echo "  CentOS/RHEL: sudo yum install aria2"
+        echo "  MacOS: brew install aria2"
+    fi
+else
+    print_status "aria2c is already installed"
+fi
+
+# Step 10: Create necessary directories
+echo ""
+echo "Step 10: Creating directory structure..."
 mkdir -p musubi-tuner/{models/{diffusion_models,text_encoders,vae},output,logs}
 mkdir -p dataset/{images,videos,captions}
 print_status "Directory structure created"
@@ -283,12 +314,18 @@ echo "  - Python: $PYTHON_VERSION"
 echo "  - GPU: $GPU_NAME ($GPU_MEMORY MB)"
 echo "  - CUDA: $CUDA_VERSION"
 echo "  - PyTorch: 2.7.0"
+echo "  - aria2c: $(command -v aria2c &> /dev/null && echo "Installed" || echo "Not installed - please install manually")"
 echo ""
-echo "Next steps:"
-echo "  1. Run ./download_models.sh to download WAN2.2 models"
+echo "IMPORTANT: You must manually activate the environment!"
+echo "  1. Run: conda activate wan22_lora"
+echo "  2. Run: conda install protobuf -y"
+echo "  3. Run: ./step1.5_activate_and_verify.sh --verify"
+echo ""
+echo "After activation, continue with:"
+echo "  1. Run ./step2_download_models.sh to download WAN2.2 models"
 echo "  2. Prepare your dataset in dataset/ directory"
-echo "  3. Run ./prepare_dataset.sh to configure training"
-echo "  4. Run ./train_wan22_lora.sh to start training"
+echo "  3. Run ./step3_prepare_dataset.sh to configure training"
+echo "  4. Run ./step4_train_wan22_lora.sh to start training"
 echo ""
 
 # Create activation script for future use
