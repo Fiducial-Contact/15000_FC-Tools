@@ -191,9 +191,7 @@ pip install protobuf six
 echo ""
 echo "Step 8: Verifying installation..."
 
-# Run verification in the virtual environment (already in musubi-tuner directory)
-source venv/bin/activate
-
+# Run verification (virtual environment is already activated from Step 4)
 python -c "
 import sys
 try:
