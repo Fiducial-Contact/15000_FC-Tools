@@ -168,7 +168,7 @@ if [[ "$TORCH_INSTALLED" == "2.7.0"* ]]; then
     print_status "PyTorch 2.7.0 is already installed"
 else
     print_status "Installing PyTorch 2.7.0 and related packages..."
-    python -m pip install torch==2.7.0 torchvision==0.22.0 xformers==0.0.30 --index-url https://download.pytorch.org/whl/cu128
+    python -m pip install --timeout=120 --retries=3 torch==2.7.0 torchvision==0.22.0 xformers==0.0.30 --index-url https://download.pytorch.org/whl/cu128
 fi
 
 # Step 7: Install musubi-tuner and dependencies
@@ -180,13 +180,26 @@ if python -c "import musubi_tuner" 2>/dev/null; then
     print_status "musubi-tuner is already installed"
 else
     print_status "Installing musubi-tuner in editable mode..."
-    python -m pip install -e .
+    # For packages from aliyun mirror, add extra index
+    # Note: If bitsandbytes download fails, it will be installed separately
+    python -m pip install --timeout=120 --retries=3 -e . --extra-index-url https://mirrors.aliyun.com/pypi/simple/ || {
+        print_warning "Installation failed, trying without bitsandbytes..."
+        # Try installing without bitsandbytes first
+        python -m pip install --timeout=120 --retries=3 --no-deps -e .
+        # Then install other dependencies
+        python -m pip install --timeout=120 --retries=3 accelerate diffusers transformers huggingface-hub safetensors \
+            opencv-python av sentencepiece tqdm einops voluptuous easydict toml ftfy \
+            --extra-index-url https://mirrors.aliyun.com/pypi/simple/
+        # Try bitsandbytes separately with longer timeout
+        print_warning "Attempting to install bitsandbytes separately..."
+        python -m pip install --timeout=300 --retries=5 bitsandbytes==0.45.4 || print_warning "Bitsandbytes installation failed, continuing without it"
+    }
 fi
 
 # Install additional required packages
 print_status "Installing additional dependencies..."
 echo "Using pip: $(which pip)"
-python -m pip install protobuf six
+python -m pip install --timeout=120 --retries=3 protobuf six
 
 # Step 8: Verify installation
 echo ""
